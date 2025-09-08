@@ -247,3 +247,11 @@ logs/
 # Temporary files
 tmp/
 temp/
+env.example
+env.production
+env.test
+env.development
+env.local
+env.production.local
+env.test.local
+env.development.local

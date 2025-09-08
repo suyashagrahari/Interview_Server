@@ -53,20 +53,6 @@ A scalable, production-ready Express.js backend server for the Interview Practic
    cp env.example .env
    ```
 
-   Update the `.env` file with your configuration:
-
-   ```env
-   NODE_ENV=development
-   PORT=3001
-   MONGODB_URI=mongodb://localhost:27017/interview_platform
-   JWT_SECRET=your-super-secret-jwt-key
-   JWT_EXPIRE=7d
-   JWT_REFRESH_SECRET=your-super-secret-refresh-key
-   JWT_REFRESH_EXPIRE=30d
-   GOOGLE_CLIENT_ID=your-google-client-id
-   GOOGLE_CLIENT_SECRET=your-google-client-secret
-   ```
-
 4. **Start the server**
 
    ```bash
