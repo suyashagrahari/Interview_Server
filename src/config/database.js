@@ -49,11 +49,8 @@ class Database {
         process.exit(0);
       });
     } catch (error) {
-      logger.warn(
-        "Database connection failed, continuing without database:",
-        error.message
-      );
-      // Don't exit the process, just log the warning
+      logger.error("Database connection failed:", error.message);
+      throw error; // Re-throw the error so it can be handled by the caller
     }
   }
 

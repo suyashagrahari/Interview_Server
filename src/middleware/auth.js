@@ -28,9 +28,8 @@ const authenticateToken = async (req, res, next) => {
     });
 
     // Check if user still exists and is active
-    const user = await User.findById(decoded.id).select(
-      "-password -refreshTokens"
-    );
+    // Include refreshTokens for logout functionality
+    const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
       return res.status(401).json({

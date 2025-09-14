@@ -53,9 +53,12 @@ A scalable, production-ready Express.js backend server for the Interview Practic
    cp env.example .env
    ```
 
-4. **Start the server**
+4. **Start MongoDB and the server**
 
    ```bash
+   # Start MongoDB (if not already running)
+   npm run mongodb:start
+
    # Development mode
    npm run dev
 
@@ -63,7 +66,29 @@ A scalable, production-ready Express.js backend server for the Interview Practic
    npm start
    ```
 
+   **Quick Setup (one command):**
+
+   ```bash
+   npm run setup
+   ```
+
 The server will start on `http://localhost:3001`
+
+### MongoDB Management
+
+```bash
+# Start MongoDB
+npm run mongodb:start
+
+# Stop MongoDB
+npm run mongodb:stop
+
+# Restart MongoDB
+npm run mongodb:restart
+
+# Check MongoDB status
+npm run mongodb:status
+```
 
 ## API Endpoints
 
@@ -172,11 +197,16 @@ src/
 ### Scripts
 
 ```bash
-npm run dev          # Start development server with nodemon
-npm start            # Start production server
-npm test             # Run tests
-npm run lint         # Run ESLint
-npm run lint:fix     # Fix ESLint errors
+npm run dev              # Start development server with nodemon
+npm start                # Start production server
+npm test                 # Run tests
+npm run lint             # Run ESLint
+npm run lint:fix         # Fix ESLint errors
+npm run mongodb:start    # Start MongoDB service
+npm run mongodb:stop     # Stop MongoDB service
+npm run mongodb:restart  # Restart MongoDB service
+npm run mongodb:status   # Check MongoDB status
+npm run setup            # Complete setup (env + install + start MongoDB)
 ```
 
 ### Logging

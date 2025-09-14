@@ -23,6 +23,7 @@ const authRoutes = require("./routes/auth");
 
 // Import database
 const database = require("./config/database");
+const logger = require("./utils/logger");
 
 // Create Express app
 const app = express();
@@ -87,6 +88,17 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Connect to database
-database.connect();
+const initializeDatabase = async () => {
+  try {
+    await database.connect();
+    logger.info("Database connection established successfully");
+  } catch (error) {
+    logger.error("Failed to connect to database:", error);
+    process.exit(1);
+  }
+};
+
+// Initialize database connection
+initializeDatabase();
 
 module.exports = app;

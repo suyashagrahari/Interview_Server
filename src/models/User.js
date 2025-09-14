@@ -70,16 +70,236 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    refreshTokens: [
-      {
-        token: String,
-        createdAt: {
-          type: Date,
-          default: Date.now,
-          expires: 2592000, // 30 days
+    refreshTokens: {
+      type: [
+        {
+          token: String,
+          createdAt: {
+            type: Date,
+            default: Date.now,
+            expires: 2592000, // 30 days
+          },
         },
+      ],
+      default: [],
+    },
+    // Profile information
+    profile: {
+      jobTitle: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: [100, "Job title cannot be more than 100 characters"],
       },
-    ],
+      phone: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: [20, "Phone number cannot be more than 20 characters"],
+      },
+      website: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: [200, "Website URL cannot be more than 200 characters"],
+      },
+      linkedin: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: [200, "LinkedIn URL cannot be more than 200 characters"],
+      },
+      country: {
+        type: String,
+        default: "India",
+        trim: true,
+        maxlength: [50, "Country cannot be more than 50 characters"],
+      },
+      state: {
+        type: String,
+        default: "Rajasthan",
+        trim: true,
+        maxlength: [50, "State cannot be more than 50 characters"],
+      },
+      city: {
+        type: String,
+        default: "Jaipur",
+        trim: true,
+        maxlength: [50, "City cannot be more than 50 characters"],
+      },
+      showStateOnResume: {
+        type: Boolean,
+        default: false,
+      },
+      showCountryOnResume: {
+        type: Boolean,
+        default: true,
+      },
+      showCityOnResume: {
+        type: Boolean,
+        default: false,
+      },
+      summary: {
+        type: String,
+        default: "",
+        maxlength: [1000, "Summary cannot be more than 1000 characters"],
+      },
+      experiences: [
+        {
+          id: {
+            type: String,
+            required: true,
+          },
+          role: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Role cannot be more than 100 characters"],
+          },
+          company: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Company cannot be more than 100 characters"],
+          },
+          location: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Location cannot be more than 100 characters"],
+          },
+          startDate: {
+            type: String,
+            required: true,
+          },
+          endDate: {
+            type: String,
+            required: true,
+          },
+          description: {
+            type: String,
+            required: true,
+            maxlength: [
+              1000,
+              "Description cannot be more than 1000 characters",
+            ],
+          },
+          isCurrent: {
+            type: Boolean,
+            default: false,
+          },
+        },
+      ],
+      projects: [
+        {
+          id: {
+            type: String,
+            required: true,
+          },
+          title: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [
+              100,
+              "Project title cannot be more than 100 characters",
+            ],
+          },
+          organization: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Organization cannot be more than 100 characters"],
+          },
+          startDate: {
+            type: String,
+            required: true,
+          },
+          endDate: {
+            type: String,
+            required: true,
+          },
+          url: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "URL cannot be more than 200 characters"],
+          },
+          description: {
+            type: String,
+            required: true,
+            maxlength: [
+              1000,
+              "Description cannot be more than 1000 characters",
+            ],
+          },
+        },
+      ],
+      educations: [
+        {
+          id: {
+            type: String,
+            required: true,
+          },
+          degree: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Degree cannot be more than 100 characters"],
+          },
+          institution: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Institution cannot be more than 100 characters"],
+          },
+          location: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [100, "Location cannot be more than 100 characters"],
+          },
+          graduationDate: {
+            type: String,
+            required: true,
+          },
+          minor: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [100, "Minor cannot be more than 100 characters"],
+          },
+          gpa: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [10, "GPA cannot be more than 10 characters"],
+          },
+          additionalInfo: {
+            type: String,
+            default: "",
+            maxlength: [
+              500,
+              "Additional info cannot be more than 500 characters",
+            ],
+          },
+        },
+      ],
+      skills: [
+        {
+          id: {
+            type: String,
+            required: true,
+          },
+          name: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [50, "Skill name cannot be more than 50 characters"],
+          },
+        },
+      ],
+    },
   },
   {
     timestamps: true,
@@ -155,18 +375,30 @@ userSchema.methods.generateRefreshToken = function () {
 
 // Instance method to add refresh token
 userSchema.methods.addRefreshToken = function (token) {
+  // Ensure refreshTokens is an array, default to empty array if undefined
+  if (!Array.isArray(this.refreshTokens)) {
+    this.refreshTokens = [];
+  }
   this.refreshTokens.push({ token });
   return this.save();
 };
 
 // Instance method to remove refresh token
 userSchema.methods.removeRefreshToken = function (token) {
+  // Ensure refreshTokens is an array, default to empty array if undefined
+  if (!Array.isArray(this.refreshTokens)) {
+    this.refreshTokens = [];
+  }
   this.refreshTokens = this.refreshTokens.filter((t) => t.token !== token);
   return this.save();
 };
 
 // Instance method to clean old refresh tokens
 userSchema.methods.cleanOldRefreshTokens = function () {
+  // Ensure refreshTokens is an array, default to empty array if undefined
+  if (!Array.isArray(this.refreshTokens)) {
+    this.refreshTokens = [];
+  }
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   this.refreshTokens = this.refreshTokens.filter(
     (token) => token.createdAt > thirtyDaysAgo
