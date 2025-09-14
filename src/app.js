@@ -20,6 +20,8 @@ const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 // Import routes
 const authRoutes = require("./routes/auth");
+const resumeRoutes = require("./routes/resume");
+const interviewRoutes = require("./routes/interview");
 
 // Import database
 const database = require("./config/database");
@@ -70,6 +72,8 @@ app.get("/health", (req, res) => {
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/resume", resumeRoutes);
+app.use("/api/interview", interviewRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
