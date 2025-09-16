@@ -172,5 +172,3 @@ module.exports = {
   updateInterviewer,
   deleteInterviewer,
 };
-
-
