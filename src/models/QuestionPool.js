@@ -79,6 +79,14 @@ const questionPoolSchema = new mongoose.Schema(
             maxlength: [50, "Keyword cannot be more than 50 characters"],
           },
         ],
+        isCompleted: {
+          type: Boolean,
+          default: false,
+        },
+        completedAt: {
+          type: Date,
+          default: null,
+        },
       },
     ],
 
@@ -163,6 +171,17 @@ questionPoolSchema.methods.updateQuestion = function (questionId, updateData) {
 questionPoolSchema.methods.removeQuestion = function (questionId) {
   this.questions = this.questions.filter((q) => q.questionId !== questionId);
   return this.save();
+};
+
+// Instance method to mark question as completed
+questionPoolSchema.methods.markQuestionCompleted = function (questionId) {
+  const question = this.questions.find((q) => q.questionId === questionId);
+  if (question) {
+    question.isCompleted = true;
+    question.completedAt = new Date();
+    return this.save();
+  }
+  throw new Error("Question not found");
 };
 
 // Pre-save middleware to update updatedAt

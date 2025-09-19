@@ -70,6 +70,12 @@ const interviewSchema = new mongoose.Schema(
         trim: true,
         maxlength: [500, "Bio cannot be more than 500 characters"],
       },
+      introduction: {
+        type: String,
+        required: false,
+        trim: true,
+        maxlength: [1000, "Introduction cannot be more than 1000 characters"],
+      },
     },
     companyName: {
       type: String,

@@ -13,6 +13,10 @@ const {
   getInterviewQuestions,
   generateInterviewQuestions,
   testChatGPTConnection,
+  generateFirstQuestion,
+  submitAnswer,
+  endInterview,
+  testing,
 } = require("../controllers/interviewController");
 const { handleValidationErrors } = require("../middleware/validation");
 
@@ -262,6 +266,8 @@ router.post(
   addQuestion
 );
 
+router.post("/test", testing);
+
 /**
  * @route   PUT /api/interview/:id/questions/:questionId/answer
  * @desc    Update answer for a question
@@ -301,6 +307,26 @@ router.delete("/:id", authenticateToken, deleteInterview);
 router.get("/test-chatgpt", authenticateToken, testChatGPTConnection);
 
 /**
+ * @route   POST /api/interview/:id/generate-first-question
+ * @desc    Generate first question (introduction) for interview
+ * @access  Private
+ */
+router.post(
+  "/:id/generate-first-question",
+  authenticateToken,
+  [
+    body("interviewerBio")
+      .notEmpty()
+      .withMessage("Interviewer bio is required")
+      .trim()
+      .isLength({ min: 10, max: 1000 })
+      .withMessage("Interviewer bio must be between 10 and 1000 characters"),
+    handleValidationErrors,
+  ],
+  generateFirstQuestion
+);
+
+/**
  * @route   GET /api/interview/:id/questions
  * @desc    Get questions for an interview
  * @access  Private
@@ -317,5 +343,88 @@ router.post(
   authenticateToken,
   generateInterviewQuestions
 );
+
+/**
+ * @route   POST /api/interview/:id/questions/:questionId/submit-answer
+ * @desc    Submit answer and get analysis + next question
+ * @access  Private
+ */
+router.post(
+  "/:id/questions/:questionId/submit-answer",
+  authenticateToken,
+  [
+    body("answer")
+      .notEmpty()
+      .withMessage("Answer is required")
+      .trim()
+      .isLength({ min: 1, max: 5000 })
+      .withMessage("Answer must be between 1 and 5000 characters"),
+
+    body("timeSpent")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage("Time spent must be a non-negative integer"),
+
+    body("startTime")
+      .optional()
+      .isISO8601()
+      .withMessage("Start time must be a valid ISO 8601 date"),
+
+    body("endTime")
+      .optional()
+      .isISO8601()
+      .withMessage("End time must be a valid ISO 8601 date"),
+
+    body("tabSwitches")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage("Tab switches must be a non-negative integer"),
+
+    body("copyPasteCount")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage("Copy paste count must be a non-negative integer"),
+
+    body("faceDetection")
+      .optional()
+      .isBoolean()
+      .withMessage("Face detection must be a boolean"),
+
+    body("mobileDetection")
+      .optional()
+      .isBoolean()
+      .withMessage("Mobile detection must be a boolean"),
+
+    body("laptopDetection")
+      .optional()
+      .isBoolean()
+      .withMessage("Laptop detection must be a boolean"),
+
+    body("zoomIn")
+      .optional()
+      .isBoolean()
+      .withMessage("Zoom in must be a boolean"),
+
+    body("zoomOut")
+      .optional()
+      .isBoolean()
+      .withMessage("Zoom out must be a boolean"),
+
+    body("questionNumber")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("Question number must be a positive integer"),
+
+    handleValidationErrors,
+  ],
+  submitAnswer
+);
+
+/**
+ * @route   POST /api/interview/:id/end
+ * @desc    End interview and mark as completed
+ * @access  Private
+ */
+router.post("/:id/end", authenticateToken, endInterview);
 
 module.exports = router;

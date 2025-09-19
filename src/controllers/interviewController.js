@@ -1,507 +1,255 @@
 const Interview = require("../models/Interview");
 const Resume = require("../models/Resume");
+const User = require("../models/User");
 const logger = require("../utils/logger");
-const questionGenerationService = require("../services/questionGenerationService");
+const InterviewService = require("../services/interviewService");
+const QuestionGenerationService = require("../services/questionGenerationService");
+const QuestionManagementService = require("../services/questionManagementService");
+const AnalysisService = require("../services/analysisService");
 const chatGPTService = require("../services/chatgptService");
+const {
+  validateInterviewRequest,
+  validateAnswerSubmission,
+  validateQuestionAddition,
+  validateStatusUpdate,
+  validatePaginationParams,
+} = require("../utils/validation");
+const {
+  sendSuccessResponse,
+  sendErrorResponse,
+  sendAuthRequiredError,
+  sendValidationError,
+  sendNotFoundError,
+  sendConflictError,
+  sendInternalServerError,
+  sendPaginatedResponse,
+  sendCreatedResponse,
+} = require("../utils/responseHelpers");
 
 /**
  * Start a new interview session
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const startInterview = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const {
-      resumeId,
-      interviewType,
-      level,
-      difficultyLevel,
-      jobRole,
-      interviewerId,
-      interviewer,
-      companyName,
-      experienceLevel,
-      skills,
-      additionalNotes,
-      scheduled,
-      scheduledDate,
-      scheduledTime,
-    } = req.body;
-
-    logger.info("req.body -->", req.body);
-    console.log("req.body -->", req.body);
-    // Validate required fields
-    if (
-      !resumeId ||
-      !interviewType ||
-      !level ||
-      !difficultyLevel ||
-      !jobRole ||
-      !interviewerId
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Missing required fields: resumeId, interviewType, level, difficultyLevel, jobRole, interviewerId",
-      });
+    const validation = validateInterviewRequest(req.body);
+    if (!validation.isValid) {
+      return sendValidationError(res, validation.errors);
     }
 
-    // Validate interviewer details
-    if (
-      !interviewer ||
-      !interviewer.name ||
-      !interviewer.experience ||
-      !interviewer.bio
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Missing required interviewer details: name, experience, and bio are required",
-      });
+    // Check for active interview
+    const activeInterviewCheck = await InterviewService.checkActiveInterview(
+      req.user.id
+    );
+    if (activeInterviewCheck.hasActive) {
+      return sendConflictError(
+        res,
+        "You already have an active interview session. Please complete or cancel it before starting a new one.",
+        {
+          interviewId: activeInterviewCheck.interview._id,
+          status: activeInterviewCheck.interview.status,
+        }
+      );
     }
 
-    // Validate number of interviewers
-    if (
-      interviewer.numberOfInterviewers &&
-      (interviewer.numberOfInterviewers < 1 ||
-        interviewer.numberOfInterviewers > 10)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Number of interviewers must be between 1 and 10",
-      });
+    // Verify resume ownership
+    const resumeCheck = await InterviewService.verifyResumeOwnership(
+      req.body.resumeId,
+      req.user.id
+    );
+    if (!resumeCheck.isValid) {
+      return sendNotFoundError(res, "Resume not found or access denied");
     }
 
-    // Verify resume belongs to the user
-    const resume = await Resume.findOne({
-      _id: resumeId,
-      userId: req.user.id,
-      isActive: true,
-    });
-
-    if (!resume) {
-      return res.status(404).json({
-        success: false,
-        message: "Resume not found or access denied",
-      });
+    // Create interview
+    const interviewResult = await InterviewService.createInterview(
+      req.user.id,
+      req.body
+    );
+    if (!interviewResult.success) {
+      return sendInternalServerError(res, "Failed to create interview");
     }
 
-    // Check if user already has an active interview
-    const existingActiveInterview = await Interview.findOne({
-      candidateId: req.user.id,
-      status: { $in: ["scheduled", "in_progress"] },
-      isActive: true,
-    });
-
-    if (existingActiveInterview) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "You already have an active interview session. Please complete or cancel it before starting a new one.",
-        data: {
-          interviewId: existingActiveInterview._id,
-          status: existingActiveInterview.status,
-        },
-      });
-    }
-
-    // Create new interview
-    const interview = new Interview({
-      candidateId: req.user.id,
-      resumeId: resumeId,
-      interviewType,
-      level,
-      difficultyLevel,
-      jobRole,
-      interviewerId,
-      interviewer: {
-        name: interviewer.name,
-        numberOfInterviewers: interviewer.numberOfInterviewers || 1,
-        experience: interviewer.experience,
-        bio: interviewer.bio,
-      },
-      companyName: companyName || "",
-      experienceLevel: experienceLevel || "",
-      skills: skills || [],
-      additionalNotes: additionalNotes || "",
-      scheduled: scheduled || false,
-      scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-      scheduledTime: scheduledTime || "",
-      status: scheduled ? "scheduled" : "in_progress",
-      createdBy: req.user.id,
-    });
-
-    // If not scheduled, start immediately
-    if (!scheduled) {
-      interview.startedAt = new Date();
-    }
-
-    await interview.save();
-
-    logger.info(`Interview started for user ${req.user.id}: ${interview._id}`);
-
-    // Generate questions asynchronously (don't wait for completion)
-    questionGenerationService
-      .generateQuestionsForInterview(interview._id, req.user.id)
+    // Generate questions asynchronously
+    QuestionGenerationService.generateQuestionsForInterview(
+      interviewResult.interview._id,
+      req.user.id
+    )
       .then((result) => {
         if (result.success) {
           logger.info("Questions generated successfully for interview:", {
-            interviewId: interview._id,
+            interviewId: interviewResult.interview._id,
             questionCount: result.data.questionCount,
-            totalTokensUsed: result.data.totalTokensUsed,
-          });
-          console.log("result -->", result);
-        } else {
-          logger.warn("Questions generation failed or already exists:", {
-            interviewId: interview._id,
-            message: result.message,
           });
         }
       })
       .catch((error) => {
-        logger.error("Error generating questions asynchronously:", {
-          interviewId: interview._id,
-          error: error.message,
-        });
+        logger.error("Error generating questions asynchronously:", error);
       });
 
-    res.status(201).json({
-      success: true,
-      message: scheduled
-        ? "Interview scheduled successfully"
-        : "Interview started successfully",
-      data: {
-        interviewId: interview._id,
-        status: interview.status,
-        startedAt: interview.startedAt,
-        scheduledDate: interview.scheduledDate,
-        scheduledTime: interview.scheduledTime,
-        resumeName: resume.resumeName,
-        jobRole: interview.jobRole,
-        interviewType: interview.interviewType,
-        level: interview.level,
-        difficultyLevel: interview.difficultyLevel,
-        interviewer: {
-          name: interview.interviewer.name,
-          numberOfInterviewers: interview.interviewer.numberOfInterviewers,
-          experience: interview.interviewer.experience,
-          bio: interview.interviewer.bio,
-        },
-        questionsGenerating: true, // Indicate that questions are being generated
+    const responseData = {
+      interviewId: interviewResult.interview._id,
+      status: interviewResult.interview.status,
+      startedAt: interviewResult.interview.startedAt,
+      scheduledDate: interviewResult.interview.scheduledDate,
+      scheduledTime: interviewResult.interview.scheduledTime,
+      resumeName: resumeCheck.resume.resumeName,
+      jobRole: interviewResult.interview.jobRole,
+      interviewType: interviewResult.interview.interviewType,
+      level: interviewResult.interview.level,
+      difficultyLevel: interviewResult.interview.difficultyLevel,
+      interviewer: {
+        name: interviewResult.interview.interviewer.name,
+        numberOfInterviewers:
+          interviewResult.interview.interviewer.numberOfInterviewers,
+        experience: interviewResult.interview.interviewer.experience,
+        bio: interviewResult.interview.interviewer.bio,
       },
-    });
+      questionsGenerating: true,
+    };
+
+    return sendCreatedResponse(
+      res,
+      "Interview started successfully",
+      responseData
+    );
   } catch (error) {
     logger.error("Error starting interview:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while starting interview",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while starting interview"
+    );
   }
 };
 
 /**
  * Get all interviews for authenticated user
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const getUserInterviews = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { status, limit = 10, page = 1 } = req.query;
-    const skip = (page - 1) * limit;
-
-    let query = { candidateId: req.user.id, isActive: true };
-    if (status) {
-      query.status = status;
+    const paginationValidation = validatePaginationParams(req.query);
+    if (!paginationValidation.isValid) {
+      return sendValidationError(res, paginationValidation.errors);
     }
 
-    const interviews = await Interview.find(query)
-      .populate("resumeId", "resumeName originalFileName")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const totalInterviews = await Interview.countDocuments(query);
-
-    const interviewList = interviews.map((interview) => ({
-      id: interview._id,
-      status: interview.status,
-      interviewType: interview.interviewType,
-      jobRole: interview.jobRole,
-      level: interview.level,
-      difficultyLevel: interview.difficultyLevel,
-      companyName: interview.companyName,
-      resumeName: interview.resumeId?.resumeName || "Unknown Resume",
-      startedAt: interview.startedAt,
-      completedAt: interview.completedAt,
-      totalDuration: interview.totalDuration,
-      scheduledDate: interview.scheduledDate,
-      scheduledTime: interview.scheduledTime,
-      overallAnalysis: {
-        totalQuestions: interview.overallAnalysis.totalQuestions,
-        answeredQuestions: interview.overallAnalysis.answeredQuestions,
-        averageRating: interview.overallAnalysis.averageRating,
-        recommendation: interview.overallAnalysis.recommendation,
-        confidenceScore: interview.overallAnalysis.confidenceScore,
-      },
-      createdAt: interview.createdAt,
-    }));
-
-    res.status(200).json({
-      success: true,
-      message: "Interviews retrieved successfully",
-      data: {
-        interviews: interviewList,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(totalInterviews / limit),
-          totalInterviews,
-          hasNext: page * limit < totalInterviews,
-          hasPrev: page > 1,
-        },
-      },
+    const result = await InterviewService.getUserInterviews(req.user.id, {
+      status: req.query.status,
+      limit: paginationValidation.limit,
+      page: paginationValidation.page,
     });
+
+    if (!result.success) {
+      return sendInternalServerError(res, "Failed to retrieve interviews");
+    }
+
+    return sendPaginatedResponse(
+      res,
+      result.data.interviews,
+      result.data.pagination,
+      "Interviews retrieved successfully"
+    );
   } catch (error) {
     logger.error("Error retrieving interviews:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while retrieving interviews",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while retrieving interviews"
+    );
   }
 };
 
 /**
  * Get specific interview by ID
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const getInterviewById = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id } = req.params;
-    const interview = await Interview.findOne({
-      _id: id,
-      candidateId: req.user.id,
-      isActive: true,
-    }).populate("resumeId", "resumeName originalFileName resumeText");
-
-    if (!interview) {
-      return res.status(404).json({
-        success: false,
-        message: "Interview not found",
-      });
+    const result = await InterviewService.getInterviewById(
+      req.params.id,
+      req.user.id
+    );
+    if (!result.success) {
+      return sendNotFoundError(res, "Interview not found");
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Interview retrieved successfully",
-      data: {
-        id: interview._id,
-        status: interview.status,
-        interviewType: interview.interviewType,
-        level: interview.level,
-        difficultyLevel: interview.difficultyLevel,
-        jobRole: interview.jobRole,
-        interviewerId: interview.interviewerId,
-        companyName: interview.companyName,
-        experienceLevel: interview.experienceLevel,
-        skills: interview.skills,
-        additionalNotes: interview.additionalNotes,
-        scheduled: interview.scheduled,
-        scheduledDate: interview.scheduledDate,
-        scheduledTime: interview.scheduledTime,
-        startedAt: interview.startedAt,
-        completedAt: interview.completedAt,
-        totalDuration: interview.totalDuration,
-        resume: {
-          id: interview.resumeId?._id,
-          name: interview.resumeId?.resumeName,
-          originalFileName: interview.resumeId?.originalFileName,
-          text: interview.resumeId?.resumeText,
-        },
-        questions: interview.questions.map((q) => ({
-          questionId: q.questionId,
-          question: q.question,
-          category: q.category,
-          difficulty: q.difficulty,
-          expectedAnswer: q.expectedAnswer,
-          answer: q.answer,
-          answerAnalysis: q.answerAnalysis,
-          timeSpent: q.timeSpent,
-          answeredAt: q.answeredAt,
-          isAnswered: q.isAnswered,
-        })),
-        overallAnalysis: interview.overallAnalysis,
-        createdAt: interview.createdAt,
-        updatedAt: interview.updatedAt,
-      },
-    });
+    return sendSuccessResponse(
+      res,
+      200,
+      "Interview retrieved successfully",
+      result.data
+    );
   } catch (error) {
     logger.error("Error retrieving interview:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while retrieving interview",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while retrieving interview"
+    );
   }
 };
 
 /**
- * Update interview status (start, pause, resume, complete, cancel)
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Update interview status
  */
 const updateInterviewStatus = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: "Status is required",
-      });
+    const validation = validateStatusUpdate(req.body.status);
+    if (!validation.isValid) {
+      return sendValidationError(res, validation.errors);
     }
 
-    const validStatuses = [
-      "scheduled",
-      "in_progress",
-      "completed",
-      "cancelled",
-      "paused",
-    ];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid status. Valid statuses are: " + validStatuses.join(", "),
-      });
-    }
-
-    const interview = await Interview.findOne({
-      _id: id,
-      candidateId: req.user.id,
-      isActive: true,
-    });
-
-    if (!interview) {
-      return res.status(404).json({
-        success: false,
-        message: "Interview not found",
-      });
-    }
-
-    // Update status using appropriate method
-    switch (status) {
-      case "in_progress":
-        await interview.startInterview();
-        break;
-      case "completed":
-        await interview.completeInterview();
-        break;
-      case "paused":
-        await interview.pauseInterview();
-        break;
-      case "cancelled":
-        await interview.cancelInterview();
-        break;
-      default:
-        interview.status = status;
-        await interview.save();
-    }
-
-    logger.info(
-      `Interview ${id} status updated to ${status} by user ${req.user.id}`
+    const result = await InterviewService.updateInterviewStatus(
+      req.params.id,
+      req.user.id,
+      req.body.status
     );
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
+    }
 
-    res.status(200).json({
-      success: true,
-      message: `Interview ${status} successfully`,
-      data: {
-        interviewId: interview._id,
-        status: interview.status,
-        startedAt: interview.startedAt,
-        completedAt: interview.completedAt,
-        totalDuration: interview.totalDuration,
-      },
-    });
+    return sendSuccessResponse(
+      res,
+      200,
+      `Interview ${req.body.status} successfully`,
+      result.data
+    );
   } catch (error) {
     logger.error("Error updating interview status:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while updating interview status",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while updating interview status"
+    );
   }
 };
 
 /**
  * Add question to interview
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const addQuestion = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id } = req.params;
+    const validation = validateQuestionAddition(req.body);
+    if (!validation.isValid) {
+      return sendValidationError(res, validation.errors);
+    }
+
     const { questionId, question, category, difficulty, expectedAnswer } =
       req.body;
-
-    if (!questionId || !question || !category) {
-      return res.status(400).json({
-        success: false,
-        message: "questionId, question, and category are required",
-      });
-    }
-
-    const interview = await Interview.findOne({
-      _id: id,
-      candidateId: req.user.id,
-      isActive: true,
-    });
-
-    if (!interview) {
-      return res.status(404).json({
-        success: false,
-        message: "Interview not found",
-      });
-    }
-
     const questionData = {
       questionId,
       question,
@@ -510,308 +258,449 @@ const addQuestion = async (req, res) => {
       expectedAnswer: expectedAnswer || "",
     };
 
-    await interview.addQuestion(questionData);
+    const result = await QuestionManagementService.addQuestionToInterview(
+      req.params.id,
+      req.user.id,
+      questionData
+    );
 
-    res.status(200).json({
-      success: true,
-      message: "Question added successfully",
-      data: {
-        questionId,
-        question,
-        category,
-        difficulty: questionData.difficulty,
-      },
-    });
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
+    }
+
+    return sendSuccessResponse(
+      res,
+      200,
+      "Question added successfully",
+      result.data
+    );
   } catch (error) {
     logger.error("Error adding question:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while adding question",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while adding question"
+    );
   }
 };
 
 /**
  * Update answer for a question
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const updateAnswer = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id, questionId } = req.params;
+    const validation = validateAnswerSubmission(req.body);
+    if (!validation.isValid) {
+      return sendValidationError(res, validation.errors);
+    }
+
     const { answer, timeSpent } = req.body;
+    const result = await QuestionManagementService.updateAnswer(
+      req.params.id,
+      req.user.id,
+      req.params.questionId,
+      answer,
+      timeSpent
+    );
 
-    if (!answer) {
-      return res.status(400).json({
-        success: false,
-        message: "Answer is required",
-      });
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
     }
 
-    const interview = await Interview.findOne({
-      _id: id,
-      candidateId: req.user.id,
-      isActive: true,
-    });
-
-    if (!interview) {
-      return res.status(404).json({
-        success: false,
-        message: "Interview not found",
-      });
-    }
-
-    await interview.updateAnswer(questionId, answer, timeSpent);
-
-    res.status(200).json({
-      success: true,
-      message: "Answer updated successfully",
-      data: {
-        questionId,
-        answer,
-        timeSpent: timeSpent || 0,
-        answeredAt: new Date(),
-      },
-    });
+    return sendSuccessResponse(
+      res,
+      200,
+      "Answer updated successfully",
+      result.data
+    );
   } catch (error) {
     logger.error("Error updating answer:", error);
-    if (error.message === "Question not found") {
-      return res.status(404).json({
-        success: false,
-        message: "Question not found",
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while updating answer",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while updating answer"
+    );
   }
 };
 
 /**
  * Update answer analysis
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const updateAnswerAnalysis = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id, questionId } = req.params;
     const analysis = req.body;
+    const result = await QuestionManagementService.updateAnswerAnalysis(
+      req.params.id,
+      req.user.id,
+      req.params.questionId,
+      analysis
+    );
 
-    const interview = await Interview.findOne({
-      _id: id,
-      candidateId: req.user.id,
-      isActive: true,
-    });
-
-    if (!interview) {
-      return res.status(404).json({
-        success: false,
-        message: "Interview not found",
-      });
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
     }
 
-    await interview.updateAnswerAnalysis(questionId, analysis);
-
-    res.status(200).json({
-      success: true,
-      message: "Answer analysis updated successfully",
-      data: {
-        questionId,
-        analysis,
-      },
-    });
+    return sendSuccessResponse(
+      res,
+      200,
+      "Answer analysis updated successfully",
+      result.data
+    );
   } catch (error) {
     logger.error("Error updating answer analysis:", error);
-    if (error.message === "Question not found") {
-      return res.status(404).json({
-        success: false,
-        message: "Question not found",
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while updating answer analysis",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while updating answer analysis"
+    );
   }
 };
 
 /**
  * Delete interview
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const deleteInterview = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id } = req.params;
-    const interview = await Interview.findOne({
-      _id: id,
-      candidateId: req.user.id,
-      isActive: true,
-    });
-
-    if (!interview) {
-      return res.status(404).json({
-        success: false,
-        message: "Interview not found",
-      });
+    const result = await InterviewService.deleteInterview(
+      req.params.id,
+      req.user.id
+    );
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
     }
 
-    // Soft delete
-    interview.isActive = false;
-    await interview.save();
-
-    logger.info(`Interview deleted by user ${req.user.id}: ${interview._id}`);
-
-    res.status(200).json({
-      success: true,
-      message: "Interview deleted successfully",
-    });
+    return sendSuccessResponse(res, 200, "Interview deleted successfully");
   } catch (error) {
     logger.error("Error deleting interview:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while deleting interview",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while deleting interview"
+    );
   }
 };
 
 /**
  * Get questions for an interview
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const getInterviewQuestions = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id } = req.params;
-
-    const result = await questionGenerationService.getQuestionsForInterview(
-      id,
+    const result = await QuestionGenerationService.getQuestionsForInterview(
+      req.params.id,
       req.user.id
     );
 
     if (!result.success) {
-      return res.status(404).json({
-        success: false,
-        message: result.message,
-      });
+      return sendNotFoundError(res, result.message);
     }
 
-    res.status(200).json({
-      success: true,
-      message: result.message,
-      data: result.data,
-    });
+    return sendSuccessResponse(res, 200, result.message, result.data);
   } catch (error) {
     logger.error("Error retrieving interview questions:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while retrieving interview questions",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while retrieving interview questions"
+    );
   }
 };
 
 /**
  * Generate questions for an interview (manual trigger)
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const generateInterviewQuestions = async (req, res) => {
   try {
-    // Check if user is authenticated
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return sendAuthRequiredError(res);
     }
 
-    const { id } = req.params;
-
     const result =
-      await questionGenerationService.generateQuestionsForInterview(
-        id,
+      await QuestionGenerationService.generateQuestionsForInterview(
+        req.params.id,
         req.user.id
       );
 
     if (!result.success) {
-      return res.status(409).json({
-        success: false,
-        message: result.message,
-        data: result.data,
-      });
+      return sendConflictError(res, result.message, result.data);
     }
 
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: result.data,
-    });
+    return sendCreatedResponse(res, result.message, result.data);
   } catch (error) {
     logger.error("Error generating interview questions:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while generating interview questions",
-    });
+    return sendInternalServerError(
+      res,
+      "Internal server error while generating interview questions"
+    );
   }
 };
 
 /**
  * Test ChatGPT API connection
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 const testChatGPTConnection = async (req, res) => {
   try {
     const isWorking = await chatGPTService.testConnection();
 
-    res.status(200).json({
-      success: true,
-      message: isWorking
-        ? "ChatGPT API is working"
-        : "ChatGPT API is not working",
-      data: {
+    return sendSuccessResponse(
+      res,
+      200,
+      isWorking ? "ChatGPT API is working" : "ChatGPT API is not working",
+      {
         isWorking,
-      },
-    });
+      }
+    );
   } catch (error) {
     logger.error("Error testing ChatGPT connection:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while testing ChatGPT connection",
+    return sendInternalServerError(
+      res,
+      "Internal server error while testing ChatGPT connection"
+    );
+  }
+};
+
+/**
+ * Get first question (introduction) from question pool for interview
+ */
+const generateFirstQuestion = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return sendAuthRequiredError(res);
+    }
+
+    const result = await QuestionManagementService.getFirstQuestion(
+      req.params.id,
+      req.user.id
+    );
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
+    }
+
+    return sendSuccessResponse(res, 200, result.message, result.data);
+  } catch (error) {
+    logger.error("Error getting first question:", error);
+    return sendInternalServerError(
+      res,
+      "Internal server error while getting first question"
+    );
+  }
+};
+
+/**
+ * Submit answer and get analysis + next question
+ */
+const submitAnswer = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return sendAuthRequiredError(res);
+    }
+
+    const {
+      answer,
+      timeSpent,
+      startTime,
+      endTime,
+      tabSwitches,
+      copyPasteCount,
+      faceDetection,
+      mobileDetection,
+      laptopDetection,
+      zoomIn,
+      zoomOut,
+      questionNumber,
+    } = req.body;
+
+    // Find the interview
+    const interview = await Interview.findOne({
+      _id: req.params.id,
+      candidateId: req.user.id,
+      isActive: true,
+    }).populate("resumeId", "resumeText resumeName");
+
+    if (!interview) {
+      return sendNotFoundError(res, "Interview not found");
+    }
+
+    // Find the question
+    const question = interview.questions.find(
+      (q) => q.questionId === req.params.questionId
+    );
+    if (!question) {
+      return sendNotFoundError(res, "Question not found");
+    }
+
+    // Update answer with proctoring data
+    await interview.updateAnswer(req.params.questionId, answer, timeSpent);
+
+    // Mark question as completed in question pool
+    await QuestionManagementService.markQuestionCompleted(
+      req.params.id,
+      req.user.id,
+      req.params.questionId
+    );
+
+    // Process answer analysis and next question generation in parallel
+    const [analysisResult, nextQuestionResult] = await Promise.allSettled([
+      AnalysisService.analyzeAnswer(interview, question, answer, {
+        timeSpent,
+        startTime,
+        endTime,
+        tabSwitches,
+        copyPasteCount,
+        faceDetection,
+        mobileDetection,
+        laptopDetection,
+        zoomIn,
+        zoomOut,
+      }),
+      QuestionManagementService.getNextQuestionFromPool(
+        interview,
+        questionNumber
+      ),
+    ]);
+
+    // Update answer analysis if successful
+    if (analysisResult.status === "fulfilled" && analysisResult.value.success) {
+      await interview.updateAnswerAnalysis(
+        req.params.questionId,
+        analysisResult.value.analysis
+      );
+    }
+
+    // Add next question if found
+    let nextQuestion = null;
+    if (
+      nextQuestionResult.status === "fulfilled" &&
+      nextQuestionResult.value.success &&
+      nextQuestionResult.value.question
+    ) {
+      nextQuestion = nextQuestionResult.value.question;
+      await interview.addQuestion({
+        questionId: nextQuestion.questionId,
+        question: nextQuestion.question,
+        category: nextQuestion.category,
+        difficulty: nextQuestion.difficulty || "medium",
+        expectedAnswer: nextQuestion.expectedAnswer,
+      });
+    }
+
+    logger.info(
+      `Answer submitted for interview ${req.params.id}, question ${req.params.questionId}`
+    );
+
+    return sendSuccessResponse(res, 200, "Answer submitted successfully", {
+      questionId: req.params.questionId,
+      answer,
+      analysis:
+        analysisResult.status === "fulfilled"
+          ? analysisResult.value.analysis
+          : null,
+      nextQuestion: nextQuestion,
+      questionNumber: questionNumber + 1,
     });
+  } catch (error) {
+    logger.error("Error submitting answer:", error);
+    return sendInternalServerError(
+      res,
+      "Internal server error while submitting answer"
+    );
+  }
+};
+
+/**
+ * End interview and mark as completed
+ */
+const endInterview = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return sendAuthRequiredError(res);
+    }
+
+    const result = await InterviewService.endInterview(
+      req.params.id,
+      req.user.id
+    );
+    if (!result.success) {
+      return sendNotFoundError(res, result.message);
+    }
+
+    return sendSuccessResponse(
+      res,
+      200,
+      "Interview ended successfully",
+      result.data
+    );
+  } catch (error) {
+    logger.error("Error ending interview:", error);
+    return sendInternalServerError(
+      res,
+      "Internal server error while ending interview"
+    );
+  }
+};
+
+/**
+ * Testing endpoint
+ */
+const testing = async (req, res) => {
+  try {
+    const { interviewId, userId } = req.body;
+
+    const interview = await Interview.findOne({
+      _id: interviewId,
+      candidateId: userId,
+      isActive: true,
+    })
+      .populate("resumeId", "resumeText resumeName")
+      .populate(
+        "interviewerId",
+        "name role experience bio introduction specialties"
+      );
+
+    if (!interview) {
+      return sendNotFoundError(res, "Interview not found or not active");
+    }
+
+    // Get candidate's name from user data
+    const candidate = await User.findById(userId);
+    const candidateName = candidate
+      ? `${candidate.firstName} ${candidate.lastName}`.trim()
+      : "Candidate";
+
+    // Generate introduction question
+    const introductionQuestion =
+      await AnalysisService.generateIntroductionQuestion(
+        interview,
+        candidateName
+      );
+
+    return sendSuccessResponse(res, 200, "Test successful", {
+      interview: {
+        id: interview._id,
+        jobRole: interview.jobRole,
+        interviewType: interview.interviewType,
+        level: interview.level,
+        difficultyLevel: interview.difficultyLevel,
+      },
+      candidate: {
+        name: candidateName,
+        id: userId,
+      },
+      introductionQuestion: introductionQuestion,
+    });
+  } catch (error) {
+    logger.error("Error testing:", error);
+    return sendInternalServerError(res, "Internal server error", error.message);
   }
 };
 
@@ -827,4 +716,8 @@ module.exports = {
   getInterviewQuestions,
   generateInterviewQuestions,
   testChatGPTConnection,
+  generateFirstQuestion,
+  submitAnswer,
+  endInterview,
+  testing,
 };
