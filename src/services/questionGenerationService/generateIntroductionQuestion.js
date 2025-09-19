@@ -69,6 +69,13 @@ const generateIntroductionQuestion = async (interview, candidateName) => {
       Make sure the interviewer has a proper name and specific experience details, not generic placeholders.
     `;
 
+  // Generate unique numeric question ID
+  const generateUniqueQuestionId = () => {
+    const timestamp = Date.now(); // Current timestamp
+    const random = Math.floor(Math.random() * 1000); // Random number between 0-999
+    return `${timestamp}${random}`; // Combine timestamp with random number for uniqueness
+  };
+
   try {
     logger.info("Calling ChatGPT service for introduction question...");
     const response = await chatGPTService.generateResponse(prompt);
@@ -77,7 +84,7 @@ const generateIntroductionQuestion = async (interview, candidateName) => {
     const questionData = JSON.parse(response);
 
     return {
-      questionId: questionData.questionId,
+      questionId: generateUniqueQuestionId(), // Use unique numeric ID instead of questionData.questionId
       question: questionData.question,
       category: questionData.category,
       difficulty: questionData.difficulty,
@@ -97,7 +104,7 @@ const generateIntroductionQuestion = async (interview, candidateName) => {
     const interviewerIntro = `Hello! I'm ${interviewerName}, with ${interviewerExperience} of experience. I'll be conducting your interview for the ${interview.jobRole} position today.`;
 
     return {
-      questionId: "intro_1",
+      questionId: generateUniqueQuestionId(), // Use unique numeric ID instead of "intro_1"
       question: `${interviewerIntro}\n\nNow, ${candidateName}, I'd like to learn more about you. Could you please tell me about your background, your professional experience, and what interests you most about this role?`,
       category: "Introduction",
       difficulty: "easy",
@@ -108,6 +115,3 @@ const generateIntroductionQuestion = async (interview, candidateName) => {
 };
 
 module.exports = generateIntroductionQuestion;
-
-
-

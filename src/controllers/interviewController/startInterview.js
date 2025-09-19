@@ -58,21 +58,35 @@ const startInterview = async (req, res) => {
       return sendInternalServerError(res, "Failed to create interview");
     }
 
-    // Generate questions asynchronously
-    QuestionGenerationService.generateQuestionsForInterview(
+    // Generate complete question set asynchronously (1 introduction + 8 regular questions)
+    QuestionGenerationService.generateCompleteQuestionSet(
       interviewResult.interview._id,
       req.user.id
     )
       .then((result) => {
         if (result.success) {
-          logger.info("Questions generated successfully for interview:", {
+          logger.info(
+            "Complete question set generated successfully for interview:",
+            {
+              interviewId: interviewResult.interview._id,
+              questionCount: result.data.questionCount,
+              introductionQuestion:
+                result.data.introductionQuestion?.questionId,
+              regularQuestionsCount: result.data.regularQuestions?.length || 0,
+            }
+          );
+        } else {
+          logger.warn("Failed to generate complete question set:", {
             interviewId: interviewResult.interview._id,
-            questionCount: result.data.questionCount,
+            message: result.message,
           });
         }
       })
       .catch((error) => {
-        logger.error("Error generating questions asynchronously:", error);
+        logger.error(
+          "Error generating complete question set asynchronously:",
+          error
+        );
       });
 
     const responseData = {
@@ -111,4 +125,3 @@ const startInterview = async (req, res) => {
 };
 
 module.exports = startInterview;
-

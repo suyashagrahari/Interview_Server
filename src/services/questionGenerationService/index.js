@@ -1,6 +1,7 @@
 // Main question generation service - exports all modular functions
 const generateInterviewQuestions = require("./generateInterviewQuestions");
 const generateIntroductionQuestion = require("./generateIntroductionQuestion");
+const generateCompleteQuestionSet = require("./generateCompleteQuestionSet");
 const generateFollowUpQuestion = require("./generateFollowUpQuestion");
 const generateNewQuestion = require("./generateNewQuestion");
 const getNextQuestionFromPool = require("./getNextQuestionFromPool");
@@ -15,6 +16,10 @@ class QuestionGenerationService {
 
   static async generateIntroductionQuestion(interview, candidateName) {
     return await generateIntroductionQuestion(interview, candidateName);
+  }
+
+  static async generateCompleteQuestionSet(interviewId, userId) {
+    return await generateCompleteQuestionSet(interviewId, userId);
   }
 
   static async generateFollowUpQuestion(
@@ -66,6 +71,7 @@ class QuestionGenerationService {
 module.exports = QuestionGenerationService;
 module.exports.generateInterviewQuestions = generateInterviewQuestions;
 module.exports.generateIntroductionQuestion = generateIntroductionQuestion;
+module.exports.generateCompleteQuestionSet = generateCompleteQuestionSet;
 module.exports.generateFollowUpQuestion = generateFollowUpQuestion;
 module.exports.generateNewQuestion = generateNewQuestion;
 module.exports.getNextQuestionFromPool = getNextQuestionFromPool;

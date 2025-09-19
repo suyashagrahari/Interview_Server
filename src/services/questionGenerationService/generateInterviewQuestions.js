@@ -1,5 +1,5 @@
 const { QuestionPool, chatGPTService, logger } = require("./dependencies");
-
+const Interview = require("../../models/Interview");
 /**
  * Generate questions for an interview based on resume
  * @param {string} interviewId - Interview ID
@@ -9,7 +9,7 @@ const { QuestionPool, chatGPTService, logger } = require("./dependencies");
 const generateQuestionsForInterview = async (interviewId, userId) => {
   try {
     // Get interview details
-    const Interview = require("../../models/Interview");
+
     const interview = await Interview.findOne({
       _id: interviewId,
       candidateId: userId,
@@ -122,6 +122,3 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
 };
 
 module.exports = generateQuestionsForInterview;
-
-
-
