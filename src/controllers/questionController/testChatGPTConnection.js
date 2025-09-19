@@ -29,3 +29,5 @@ const testChatGPTConnection = async (req, res) => {
 
 module.exports = testChatGPTConnection;
 
+
+

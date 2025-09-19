@@ -33,3 +33,5 @@ const markQuestionCompleted = async (interviewId, userId, questionId) => {
 
 module.exports = markQuestionCompleted;
 
+
+

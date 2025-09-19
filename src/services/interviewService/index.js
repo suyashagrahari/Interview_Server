@@ -60,3 +60,5 @@ module.exports.updateInterviewStatus = updateInterviewStatus;
 module.exports.deleteInterview = deleteInterview;
 module.exports.endInterview = endInterview;
 
+
+
