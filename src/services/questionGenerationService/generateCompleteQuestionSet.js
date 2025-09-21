@@ -156,17 +156,6 @@ const generateCompleteQuestionSet = async (interviewId, userId) => {
 
     await questionPool.save();
 
-    // Add questions to the interview schema
-    for (const questionData of allQuestions) {
-      await interview.addQuestion({
-        questionId: questionData.questionId,
-        question: questionData.question,
-        category: questionData.category,
-        difficulty: questionData.difficulty,
-        expectedAnswer: questionData.expectedAnswer,
-      });
-    }
-
     logger.info("Complete question set generated successfully", {
       interviewId,
       questionPoolId: questionPool._id,

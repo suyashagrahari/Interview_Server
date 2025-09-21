@@ -79,17 +79,6 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
 
     await questionPool.save();
 
-    // Add questions to the interview
-    for (const questionData of chatGPTResponse.questions) {
-      await interview.addQuestion({
-        questionId: questionData.questionId,
-        question: questionData.question,
-        category: questionData.category,
-        difficulty: "medium", // Default difficulty
-        expectedAnswer: questionData.expectedAnswer,
-      });
-    }
-
     logger.info("Questions generated successfully", {
       interviewId,
       questionPoolId: questionPool._id,
