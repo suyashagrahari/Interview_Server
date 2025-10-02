@@ -130,6 +130,14 @@ const interviewSchema = new mongoose.Schema(
       type: Number, // in minutes
       default: 0,
     },
+    timeRemaining: {
+      type: Number, // in seconds
+      default: 2700, // 45 minutes = 2700 seconds
+    },
+    lastTimeUpdate: {
+      type: Date,
+      default: null,
+    },
     // Questions and Answers
     questions: [
       {

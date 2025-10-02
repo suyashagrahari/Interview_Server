@@ -16,6 +16,8 @@ const {
   submitAnswer,
   endInterview,
   testing,
+  checkActiveInterview,
+  resumeInterview,
 } = require("../controllers/interviewController");
 const {
   validateStartInterview,
@@ -49,6 +51,29 @@ router.post(
  * @access  Private
  */
 router.get("/", authenticateToken, getUserInterviews);
+
+/**
+ * @route   GET /api/interview/check-active
+ * @desc    Check for active/incomplete interview (cross-device support)
+ * @access  Private
+ * @note    Using check-active instead of active to avoid route conflicts
+ */
+router.get("/check-active", authenticateToken, checkActiveInterview);
+
+/**
+ * @route   GET /api/interview/resume/:id
+ * @desc    Resume an interview from any device
+ * @access  Private
+ * @note    Changed from /:id/resume to resume/:id to avoid conflicts
+ */
+router.get("/resume/:id", authenticateToken, resumeInterview);
+
+/**
+ * @route   GET /api/interview/test-chatgpt
+ * @desc    Test ChatGPT API connection
+ * @access  Private
+ */
+router.get("/test-chatgpt", authenticateToken, testChatGPTConnection);
 
 /**
  * @route   GET /api/interview/:id
@@ -113,13 +138,6 @@ router.put(
  * @access  Private
  */
 router.delete("/:id", authenticateToken, deleteInterview);
-
-/**
- * @route   GET /api/interview/test-chatgpt
- * @desc    Test ChatGPT API connection
- * @access  Private
- */
-router.get("/test-chatgpt", authenticateToken, testChatGPTConnection);
 
 /**
  * @route   POST /api/interview/:id/generate-first-question
