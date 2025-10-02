@@ -19,6 +19,11 @@ const generateFollowUpQuestion = async (
       ? questionIndex
       : 0;
 
+  // Generate unique ID for follow-up question
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  const uniqueFollowUpId = `followup_${timestamp}_${random}`;
+
   const prompt = `Generate a follow-up question for an interview.
 
 PREVIOUS QUESTION: ${previousQuestion.question}
@@ -39,9 +44,9 @@ Generate a relevant follow-up question that:
 
 Respond with JSON format:
 {
-  "questionId": "followup_${safeQuestionIndex + 1}",
+  "questionId": "${uniqueFollowUpId}",
   "question": "The follow-up question",
-  "category": "Technical Skills",
+  "category": "Follow-up",
   "difficulty": "medium",
   "expectedAnswer": "Expected answer format"
 }`;
@@ -51,8 +56,7 @@ Respond with JSON format:
     const questionData = JSON.parse(response.content);
 
     return {
-      questionId:
-        questionData.questionId || `followup_${safeQuestionIndex + 1}`,
+      questionId: questionData.questionId || uniqueFollowUpId,
       question: questionData.question,
       category: questionData.category || "Follow-up",
       difficulty: questionData.difficulty || "medium",
@@ -65,7 +69,7 @@ Respond with JSON format:
 
     // Fallback question
     return {
-      questionId: `followup_${safeQuestionIndex + 1}`,
+      questionId: uniqueFollowUpId,
       question:
         "Can you elaborate more on that point? What specific challenges did you face and how did you overcome them?",
       category: "Follow-up",

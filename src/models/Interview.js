@@ -152,6 +152,11 @@ const interviewSchema = new mongoose.Schema(
           enum: ["easy", "medium", "hard"],
           default: "medium",
         },
+        questionType: {
+          type: String,
+          enum: ["pool", "followup"],
+          default: "pool",
+        },
         expectedAnswer: {
           type: String,
           default: "",
@@ -391,7 +396,17 @@ interviewSchema.methods.cancelInterview = function () {
 
 // Instance method to add question
 interviewSchema.methods.addQuestion = function (questionData) {
-  this.questions.push(questionData);
+  console.log(`🔍 DEBUG: Adding question to interview ${this._id}:`, {
+    questionId: questionData.questionId,
+    questionType: questionData.questionType || "pool",
+    currentQuestionCount: this.questions.length,
+    stackTrace: new Error().stack.split('\n')[1].trim()
+  });
+
+  this.questions.push({
+    ...questionData,
+    questionType: questionData.questionType || "pool",
+  });
   this.overallAnalysis.totalQuestions = this.questions.length;
   return this.save();
 };

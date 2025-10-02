@@ -83,6 +83,14 @@ const questionPoolSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+        isAsked: {
+          type: Boolean,
+          default: false,
+        },
+        askedAt: {
+          type: Date,
+          default: null,
+        },
         completedAt: {
           type: Date,
           default: null,
@@ -179,6 +187,17 @@ questionPoolSchema.methods.markQuestionCompleted = function (questionId) {
   if (question) {
     question.isCompleted = true;
     question.completedAt = new Date();
+    return this.save();
+  }
+  throw new Error("Question not found");
+};
+
+// Instance method to mark question as asked
+questionPoolSchema.methods.markQuestionAsked = function (questionId) {
+  const question = this.questions.find((q) => q.questionId === questionId);
+  if (question) {
+    question.isAsked = true;
+    question.askedAt = new Date();
     return this.save();
   }
   throw new Error("Question not found");

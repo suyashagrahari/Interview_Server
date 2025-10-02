@@ -65,7 +65,11 @@ const getFirstQuestion = async (interviewId, userId) => {
       category: firstQuestion.category,
       difficulty: "easy",
       expectedAnswer: firstQuestion.expectedAnswer,
+      questionType: "pool",
     });
+
+    // Mark question as asked in question pool
+    await questionPool.markQuestionAsked(firstQuestion.questionId);
 
     logger.info(
       `First question retrieved from pool for interview ${interviewId}`

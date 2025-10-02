@@ -43,7 +43,7 @@ RESPONSE FORMAT (JSON):
 {
   "questions": [
     {
-      "questionId": "q1",
+      "questionId": "1703123456789123",
       "question": "What are React Hooks, and can you explain a situation where you used useEffect and useMemo in a project?",
       "category": "Technical Skills",
       "expectedAnswer": "React Hooks are functions that allow developers to use state and lifecycle features in functional components without writing a class. Two commonly used hooks are useEffect and useMemo. In one of my projects, I worked on a dashboard where real-time data was being fetched from an API every few seconds. I used useEffect to set up the data-fetching interval and clean it up when the component unmounted, ensuring no memory leaks. For performance optimization, I used useMemo to memoize expensive calculations, such as filtering large data sets, so that the function did not recompute unless the data actually changed. This significantly reduced unnecessary re-renders and improved the performance of the app. By combining these hooks, I was able to keep the code cleaner, more readable, and more efficient, which impressed both my team and the client.",
@@ -60,11 +60,10 @@ IMPORTANT:
 - Categories should be relevant (e.g., "Technical Skills", "Problem Solving", "System Design", "Leadership", etc.)
 - Questions should progressively increase in complexity
 - Include both theoretical and practical questions
+- CRITICAL: Generate UNIQUE questionId for each question using timestamp format: current timestamp + random 3-digit number (e.g., "1703123456789123", "1703123456789456", etc.)
+- Each questionId must be a unique numeric string - never use "q1", "q2", etc.
 
 Generate the questions now:`;
 };
 
 module.exports = buildPrompt;
-
-
-

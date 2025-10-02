@@ -1,5 +1,5 @@
 const { QuestionPool, chatGPTService, logger } = require("./dependencies");
-
+const Interview = require("../../models/Interview");
 /**
  * Generate questions for an interview based on resume
  * @param {string} interviewId - Interview ID
@@ -9,7 +9,7 @@ const { QuestionPool, chatGPTService, logger } = require("./dependencies");
 const generateQuestionsForInterview = async (interviewId, userId) => {
   try {
     // Get interview details
-    const Interview = require("../../models/Interview");
+
     const interview = await Interview.findOne({
       _id: interviewId,
       candidateId: userId,
@@ -79,17 +79,6 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
 
     await questionPool.save();
 
-    // Add questions to the interview
-    for (const questionData of chatGPTResponse.questions) {
-      await interview.addQuestion({
-        questionId: questionData.questionId,
-        question: questionData.question,
-        category: questionData.category,
-        difficulty: "medium", // Default difficulty
-        expectedAnswer: questionData.expectedAnswer,
-      });
-    }
-
     logger.info("Questions generated successfully", {
       interviewId,
       questionPoolId: questionPool._id,
@@ -122,6 +111,3 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
 };
 
 module.exports = generateQuestionsForInterview;
-
-
-
