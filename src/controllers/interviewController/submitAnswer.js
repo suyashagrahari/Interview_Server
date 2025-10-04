@@ -152,6 +152,9 @@ const submitAnswer = async (req, res) => {
       `Answer submitted for interview ${req.params.id}, question ${req.params.questionId}`
     );
 
+    // Check if interview should be completed (18 questions reached and no next question)
+    const isInterviewComplete = interview.questions.length >= 18 && !nextQuestion;
+
     return sendSuccessResponse(res, 200, "Answer submitted successfully", {
       questionId: req.params.questionId,
       answer,
@@ -161,6 +164,8 @@ const submitAnswer = async (req, res) => {
           : null,
       nextQuestion: nextQuestion,
       questionNumber: questionNumber + 1,
+      isInterviewComplete: isInterviewComplete,
+      totalQuestionsAsked: interview.questions.length,
     });
   } catch (error) {
     logger.error("Error submitting answer:", error);

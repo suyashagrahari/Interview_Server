@@ -14,6 +14,8 @@ const generateFirstQuestion = require("./generateFirstQuestion");
 const submitAnswer = require("./submitAnswer");
 const endInterview = require("./endInterview");
 const testing = require("./testing");
+const checkActiveInterview = require("./checkActiveInterview");
+const resumeInterview = require("./resumeInterview");
 
 module.exports = {
   startInterview,
@@ -31,4 +33,6 @@ module.exports = {
   submitAnswer,
   endInterview,
   testing,
+  checkActiveInterview,
+  resumeInterview,
 };
