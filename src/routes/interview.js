@@ -18,6 +18,7 @@ const {
   testing,
   checkActiveInterview,
   resumeInterview,
+  getExpectedAnswer,
 } = require("../controllers/interviewController");
 const {
   validateStartInterview,
@@ -74,6 +75,14 @@ router.get("/resume/:id", authenticateToken, resumeInterview);
  * @access  Private
  */
 router.get("/test-chatgpt", authenticateToken, testChatGPTConnection);
+
+/**
+ * @route   GET /api/interview/:id/questions/:questionId/hint
+ * @desc    Get expected answer (hint) for a specific question
+ * @access  Private
+ * @note    Must come before /:id route to avoid conflicts
+ */
+router.get("/:id/questions/:questionId/hint", authenticateToken, getExpectedAnswer);
 
 /**
  * @route   GET /api/interview/:id

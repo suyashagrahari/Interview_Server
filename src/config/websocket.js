@@ -1,8 +1,10 @@
 const { Server } = require("socket.io");
 const InterviewTimerService = require("../services/websocket/interviewTimer");
+const InterviewHandlerService = require("../services/websocket/interviewHandler");
 
 let io;
 let timerService;
+let interviewHandler;
 
 const setupWebSocket = (server) => {
   io = new Server(server, {
@@ -15,8 +17,9 @@ const setupWebSocket = (server) => {
     pingInterval: 25000,
   });
 
-  // Initialize timer service
+  // Initialize services
   timerService = new InterviewTimerService(io);
+  interviewHandler = new InterviewHandlerService(io);
 
   io.on("connection", (socket) => {
     console.log(`🔌 Client connected: ${socket.id}`);
@@ -27,6 +30,9 @@ const setupWebSocket = (server) => {
       socket.join(`interview-${interviewId}`);
       socket.join(`user-${userId}`);
 
+      // Register connection in interview handler
+      interviewHandler.registerConnection(userId, socket.id, interviewId);
+
       // Start timer for this interview
       timerService.startTimer(interviewId, socket);
 
@@ -36,10 +42,64 @@ const setupWebSocket = (server) => {
       });
     });
 
+    // Generate first question (WebSocket)
+    socket.on("question:generate-first", async ({ interviewId, userId }) => {
+      await interviewHandler.handleGenerateFirstQuestion(socket, {
+        interviewId,
+        userId,
+      });
+    });
+
+    // Submit answer (WebSocket)
+    socket.on("answer:submit", async ({
+      interviewId,
+      questionId,
+      userId,
+      answer,
+      proctoringData,
+    }) => {
+      await interviewHandler.handleSubmitAnswer(socket, {
+        interviewId,
+        questionId,
+        userId,
+        answer,
+        proctoringData,
+      });
+    });
+
+    // Handle reconnection
+    socket.on("interview:reconnect", async ({ interviewId, userId }) => {
+      await interviewHandler.handleReconnection(socket, {
+        interviewId,
+        userId,
+      });
+    });
+
+    // Update proctoring data (tab switches, copy/paste, etc.)
+    socket.on("proctoring:update", async ({ interviewId, userId, proctoringData }) => {
+      await interviewHandler.handleProctoringUpdate(socket, {
+        interviewId,
+        userId,
+        proctoringData,
+      });
+    });
+
+    // Get proctoring data
+    socket.on("proctoring:get", async ({ interviewId, userId }) => {
+      await interviewHandler.handleGetProctoringData(socket, {
+        interviewId,
+        userId,
+      });
+    });
+
     // Leave interview room
-    socket.on("interview:leave", ({ interviewId }) => {
-      console.log(`📤 Leaving interview ${interviewId}`);
+    socket.on("interview:leave", ({ interviewId, userId }) => {
+      console.log(`📤 User ${userId} leaving interview ${interviewId}`);
       socket.leave(`interview-${interviewId}`);
+      socket.leave(`user-${userId}`);
+
+      // Unregister connection
+      interviewHandler.unregisterConnection(userId);
 
       // Stop timer if no one else in the room
       const room = io.sockets.adapter.rooms.get(`interview-${interviewId}`);
@@ -60,6 +120,7 @@ const setupWebSocket = (server) => {
     // Handle disconnect
     socket.on("disconnect", () => {
       console.log(`🔌 Client disconnected: ${socket.id}`);
+      // Note: We don't unregister here to allow reconnection
     });
   });
 

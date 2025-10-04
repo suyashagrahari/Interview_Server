@@ -16,6 +16,7 @@ const endInterview = require("./endInterview");
 const testing = require("./testing");
 const checkActiveInterview = require("./checkActiveInterview");
 const resumeInterview = require("./resumeInterview");
+const getExpectedAnswer = require("./getExpectedAnswer");
 
 module.exports = {
   startInterview,
@@ -35,4 +36,5 @@ module.exports = {
   testing,
   checkActiveInterview,
   resumeInterview,
+  getExpectedAnswer,
 };

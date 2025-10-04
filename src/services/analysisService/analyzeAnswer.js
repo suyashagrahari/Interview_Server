@@ -9,6 +9,24 @@ const { chatGPTService, logger } = require("./dependencies");
  * @returns {Promise<Object>} Analysis result
  */
 const analyzeAnswer = async (interview, question, answer, proctoringData) => {
+  // Check if user viewed the expected answer (used AI Copilot hint)
+  if (question.answerViewed) {
+    logger.warn(`Skipping analysis for question ${question.questionId} - user viewed the expected answer`);
+    return {
+      success: true,
+      analysis: {
+        relevance: 0,
+        completeness: 0,
+        technicalAccuracy: 0,
+        communication: 0,
+        overallRating: 0,
+        feedback: "Answer not analyzed - Expected answer was viewed using AI Copilot.",
+        strengths: [],
+        areasForImprovement: ["Answer was provided after viewing the expected answer"],
+      },
+    };
+  }
+
   const prompt = `Analyze the following interview answer and provide detailed feedback.
 
 QUESTION: ${question.question}

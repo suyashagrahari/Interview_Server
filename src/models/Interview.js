@@ -6,7 +6,6 @@ const interviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: [true, "Candidate ID is required"],
-      index: true,
     },
     resumeId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -248,6 +247,15 @@ const interviewSchema = new mongoose.Schema(
           type: Date,
           default: null,
         },
+        // Track if user viewed the expected answer (copilot hint)
+        answerViewed: {
+          type: Boolean,
+          default: false,
+        },
+        answerViewedAt: {
+          type: Date,
+          default: null,
+        },
       },
     ],
     // Warning System
@@ -314,6 +322,42 @@ const interviewSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    // Proctoring Data (for tracking violations during interview)
+    proctoringData: {
+      tabSwitches: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      copyPasteCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      faceDetectionIssues: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      multiplePersonDetections: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      phoneDetections: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      lastTabSwitchAt: {
+        type: Date,
+        default: null,
+      },
+      lastViolationAt: {
+        type: Date,
+        default: null,
+      },
+    },
     // Metadata
     isActive: {
       type: Boolean,
@@ -334,7 +378,6 @@ const interviewSchema = new mongoose.Schema(
 
 // Indexes for better performance
 interviewSchema.index({ candidateId: 1, status: 1 });
-interviewSchema.index({ resumeId: 1 });
 interviewSchema.index({ createdAt: -1 });
 interviewSchema.index({ startedAt: -1 });
 interviewSchema.index({ status: 1, scheduledDate: 1 });
@@ -540,6 +583,54 @@ interviewSchema.methods.calculateOverallAnalysis = function () {
   }
 
   this.overallAnalysis.answeredQuestions = answeredQuestions.length;
+};
+
+// Instance method to update proctoring data
+interviewSchema.methods.updateProctoringData = function (proctoringUpdates) {
+  if (!this.proctoringData) {
+    this.proctoringData = {
+      tabSwitches: 0,
+      copyPasteCount: 0,
+      faceDetectionIssues: 0,
+      multiplePersonDetections: 0,
+      phoneDetections: 0,
+      lastTabSwitchAt: null,
+      lastViolationAt: null,
+    };
+  }
+
+  // Update tab switches
+  if (proctoringUpdates.tabSwitches !== undefined) {
+    this.proctoringData.tabSwitches = proctoringUpdates.tabSwitches;
+    this.proctoringData.lastTabSwitchAt = new Date();
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update copy/paste count
+  if (proctoringUpdates.copyPasteCount !== undefined) {
+    this.proctoringData.copyPasteCount = proctoringUpdates.copyPasteCount;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update face detection issues
+  if (proctoringUpdates.faceDetectionIssues !== undefined) {
+    this.proctoringData.faceDetectionIssues = proctoringUpdates.faceDetectionIssues;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update multiple person detections
+  if (proctoringUpdates.multiplePersonDetections !== undefined) {
+    this.proctoringData.multiplePersonDetections = proctoringUpdates.multiplePersonDetections;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update phone detections
+  if (proctoringUpdates.phoneDetections !== undefined) {
+    this.proctoringData.phoneDetections = proctoringUpdates.phoneDetections;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  return this.save();
 };
 
 // Helper method to calculate rating variance
