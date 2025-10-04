@@ -9,8 +9,11 @@ const {
   logger,
 } = require("./dependencies");
 
+// Import sentiment analysis service
+const sentimentAnalysisService = require("../../services/sentimentAnalysisService");
+
 /**
- * Submit answer and get analysis + next question
+ * Submit answer and get analysis + next question with sentiment analysis and warning system
  */
 const submitAnswer = async (req, res) => {
   try {
@@ -44,6 +47,25 @@ const submitAnswer = async (req, res) => {
       return sendNotFoundError(res, "Interview not found");
     }
 
+    // Check if interview is already terminated
+    if (interview.isTerminated) {
+      return sendSuccessResponse(res, 200, "Interview already terminated", {
+        questionId: req.params.questionId,
+        answer,
+        analysis: null,
+        nextQuestion: null,
+        questionNumber: questionNumber,
+        isInterviewComplete: true,
+        totalQuestionsAsked: interview.questions.length,
+        warningIssued: false,
+        warningCount: interview.warningCount,
+        interviewTerminated: true,
+        canContinue: false,
+        lastWarningAt: interview.lastWarningAt,
+        questionSentiment: "NEUTRAL",
+      });
+    }
+
     // Find the question
     const question = interview.questions.find(
       (q) => q.questionId === req.params.questionId
@@ -52,8 +74,77 @@ const submitAnswer = async (req, res) => {
       return sendNotFoundError(res, "Question not found");
     }
 
-    // Update answer with proctoring data
-    await interview.updateAnswer(req.params.questionId, answer, timeSpent);
+    // Perform sentiment analysis on the answer
+    logger.info(
+      `[SubmitAnswer] Analyzing sentiment for answer: "${answer.substring(
+        0,
+        100
+      )}..."`
+    );
+    const sentimentResult = await sentimentAnalysisService.analyzeSentiment(
+      answer
+    );
+
+    const currentSentiment = sentimentResult.success
+      ? sentimentResult.sentiment
+      : "NEUTRAL";
+    logger.info(
+      `[SubmitAnswer] Sentiment analysis result: ${currentSentiment}`
+    );
+
+    // Update answer with sentiment
+    await interview.updateAnswer(
+      req.params.questionId,
+      answer,
+      timeSpent,
+      currentSentiment
+    );
+
+    // Update the question's sentiment in the interview
+    const questionToUpdate = interview.questions.find(
+      (q) => q.questionId === req.params.questionId
+    );
+    if (questionToUpdate) {
+      questionToUpdate.sentiment = currentSentiment;
+      questionToUpdate.sentimentAnalyzedAt = new Date();
+    }
+
+    // Handle warning system for negative sentiment
+    let warningIssued = false;
+    let interviewTerminated = false;
+    let canContinue = true;
+
+    if (currentSentiment === "NEGATIVE") {
+      logger.warn(
+        `[SubmitAnswer] Negative sentiment detected, current warning count: ${interview.warningCount}`
+      );
+
+      if (interview.warningCount === 0) {
+        // First warning
+        interview.warningCount = 1;
+        interview.lastWarningAt = new Date();
+        warningIssued = true;
+        logger.warn(
+          `[SubmitAnswer] First warning issued for negative sentiment`
+        );
+      } else if (interview.warningCount === 1) {
+        // Second warning - terminate interview
+        interview.warningCount = 2;
+        interview.lastWarningAt = new Date();
+        interview.isTerminated = true;
+        interview.terminationReason =
+          "Professional conduct violation - multiple inappropriate responses";
+        interviewTerminated = true;
+        canContinue = false;
+        warningIssued = true;
+        logger.error(
+          `[SubmitAnswer] Interview terminated due to second negative sentiment`
+        );
+      }
+    }
+
+    // Save interview with updated warning data
+    await interview.save();
 
     // Mark question as completed in question pool
     await QuestionManagementService.markQuestionCompleted(
@@ -63,18 +154,23 @@ const submitAnswer = async (req, res) => {
     );
 
     // Process answer analysis
-    const analysisResult = await AnalysisService.analyzeAnswer(interview, question, answer, {
-      timeSpent,
-      startTime,
-      endTime,
-      tabSwitches,
-      copyPasteCount,
-      faceDetection,
-      mobileDetection,
-      laptopDetection,
-      zoomIn,
-      zoomOut,
-    });
+    const analysisResult = await AnalysisService.analyzeAnswer(
+      interview,
+      question,
+      answer,
+      {
+        timeSpent,
+        startTime,
+        endTime,
+        tabSwitches,
+        copyPasteCount,
+        faceDetection,
+        mobileDetection,
+        laptopDetection,
+        zoomIn,
+        zoomOut,
+      }
+    );
 
     // Update answer analysis if successful
     if (analysisResult.success) {
@@ -86,19 +182,20 @@ const submitAnswer = async (req, res) => {
 
     // Determine next question based on current question type and pattern
     let nextQuestion = null;
-    const currentQuestion = interview.questions.find(
+    const lastAskedQuestion = interview.questions.find(
       (q) => q.questionId === req.params.questionId
     );
 
-    // Check if we should generate next question (max 18 questions total)
-    if (interview.questions.length < 18) {
-      if (currentQuestion.questionType === "pool") {
-        // Current question is from pool, generate follow-up question
+    // Check if we should generate next question (max 18 questions total) and interview not terminated
+    if (interview.questions.length < 18 && !interview.isTerminated) {
+      if (lastAskedQuestion.questionType === "pool") {
+        // Last question was from pool, generate follow-up question
         nextQuestion = await AnalysisService.generateFollowUpQuestion(
           interview,
-          currentQuestion,
+          lastAskedQuestion,
           answer,
-          interview.questions.length
+          interview.questions.length,
+          currentSentiment // Pass sentiment to follow-up generation
         );
 
         if (nextQuestion) {
@@ -111,10 +208,11 @@ const submitAnswer = async (req, res) => {
             questionType: "followup",
           });
         }
-      } else if (currentQuestion.questionType === "followup") {
-        // Current question is follow-up, get next question from pool
-        // Calculate correct pool question index: after introduction (0), next pool questions are at 1, 2, 3...
-        const poolQuestionIndex = Math.floor((interview.questions.length + 1) / 2);
+      } else if (lastAskedQuestion.questionType === "followup") {
+        // Last question was follow-up, get next question from pool
+        const poolQuestionIndex = Math.floor(
+          (interview.questions.length + 1) / 2
+        );
 
         // Get question pool
         const QuestionPool = require("../../models/QuestionPool");
@@ -125,9 +223,29 @@ const submitAnswer = async (req, res) => {
 
         if (questionPool && questionPool.questions[poolQuestionIndex]) {
           const poolQuestion = questionPool.questions[poolQuestionIndex];
+
+          // Personalize the pool question based on previous answer and sentiment
+          let personalizedQuestion;
+          if (currentSentiment === "NEGATIVE") {
+            // Add warning to the question
+            personalizedQuestion =
+              await AnalysisService.rephraseQuestionWithWarning(
+                poolQuestion.question,
+                currentSentiment
+              );
+          } else {
+            // Personalize based on previous answer
+            personalizedQuestion =
+              await AnalysisService.rephraseQuestionWithPersonalization(
+                poolQuestion.question,
+                answer,
+                currentSentiment
+              );
+          }
+
           nextQuestion = {
             questionId: poolQuestion.questionId,
-            question: poolQuestion.question,
+            question: personalizedQuestion,
             category: poolQuestion.category,
             difficulty: poolQuestion.difficulty || "medium",
             expectedAnswer: poolQuestion.expectedAnswer,
@@ -149,11 +267,12 @@ const submitAnswer = async (req, res) => {
     }
 
     logger.info(
-      `Answer submitted for interview ${req.params.id}, question ${req.params.questionId}`
+      `Answer submitted for interview ${req.params.id}, question ${req.params.questionId}, sentiment: ${currentSentiment}, warning count: ${interview.warningCount}`
     );
 
     // Check if interview should be completed (18 questions reached and no next question)
-    const isInterviewComplete = interview.questions.length >= 18 && !nextQuestion;
+    const isInterviewComplete =
+      interview.questions.length >= 18 && !nextQuestion;
 
     return sendSuccessResponse(res, 200, "Answer submitted successfully", {
       questionId: req.params.questionId,
@@ -166,6 +285,20 @@ const submitAnswer = async (req, res) => {
       questionNumber: questionNumber + 1,
       isInterviewComplete: isInterviewComplete,
       totalQuestionsAsked: interview.questions.length,
+      warningIssued: warningIssued,
+      warningCount: interview.warningCount,
+      interviewTerminated: interviewTerminated,
+      canContinue: canContinue,
+      lastWarningAt: interview.lastWarningAt,
+      questionSentiment: currentSentiment,
+      debug: {
+        sentimentAnalysis: sentimentResult,
+        warningSystem: {
+          currentCount: interview.warningCount,
+          isTerminated: interview.isTerminated,
+          terminationReason: interview.terminationReason,
+        },
+      },
     });
   } catch (error) {
     logger.error("Error submitting answer:", error);
@@ -177,4 +310,3 @@ const submitAnswer = async (req, res) => {
 };
 
 module.exports = submitAnswer;
-

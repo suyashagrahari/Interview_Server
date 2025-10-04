@@ -1,5 +1,7 @@
 const app = require("./app");
 const logger = require("./utils/logger");
+const http = require("http");
+const { setupWebSocket } = require("./config/websocket");
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || "localhost";
@@ -16,11 +18,19 @@ process.on("unhandledRejection", (err) => {
   process.exit(1);
 });
 
+// Create HTTP server
+const server = http.createServer(app);
+
+// Setup WebSocket
+const io = setupWebSocket(server);
+logger.info("WebSocket server initialized");
+
 // Start server
-const server = app.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, () => {
   logger.info(`Server running on http://${HOST}:${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
   logger.info(`Health check: http://${HOST}:${PORT}/health`);
+  logger.info("WebSocket enabled on port " + PORT);
 });
 
 // Graceful shutdown

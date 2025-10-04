@@ -6,7 +6,6 @@ const interviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: [true, "Candidate ID is required"],
-      index: true,
     },
     resumeId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -238,8 +237,47 @@ const interviewSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+        // Sentiment analysis for this specific question
+        sentiment: {
+          type: String,
+          enum: ["POSITIVE", "NEGATIVE", "NEUTRAL"],
+          default: "NEUTRAL",
+        },
+        sentimentAnalyzedAt: {
+          type: Date,
+          default: null,
+        },
+        // Track if user viewed the expected answer (copilot hint)
+        answerViewed: {
+          type: Boolean,
+          default: false,
+        },
+        answerViewedAt: {
+          type: Date,
+          default: null,
+        },
       },
     ],
+    // Warning System
+    warningCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 2,
+    },
+    lastWarningAt: {
+      type: Date,
+      default: null,
+    },
+    isTerminated: {
+      type: Boolean,
+      default: false,
+    },
+    terminationReason: {
+      type: String,
+      default: "",
+      maxlength: [500, "Termination reason cannot be more than 500 characters"],
+    },
     // Overall Interview Analysis
     overallAnalysis: {
       totalQuestions: {
@@ -284,6 +322,42 @@ const interviewSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    // Proctoring Data (for tracking violations during interview)
+    proctoringData: {
+      tabSwitches: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      copyPasteCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      faceDetectionIssues: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      multiplePersonDetections: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      phoneDetections: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      lastTabSwitchAt: {
+        type: Date,
+        default: null,
+      },
+      lastViolationAt: {
+        type: Date,
+        default: null,
+      },
+    },
     // Metadata
     isActive: {
       type: Boolean,
@@ -304,7 +378,6 @@ const interviewSchema = new mongoose.Schema(
 
 // Indexes for better performance
 interviewSchema.index({ candidateId: 1, status: 1 });
-interviewSchema.index({ resumeId: 1 });
 interviewSchema.index({ createdAt: -1 });
 interviewSchema.index({ startedAt: -1 });
 interviewSchema.index({ status: 1, scheduledDate: 1 });
@@ -408,7 +481,7 @@ interviewSchema.methods.addQuestion = function (questionData) {
     questionId: questionData.questionId,
     questionType: questionData.questionType || "pool",
     currentQuestionCount: this.questions.length,
-    stackTrace: new Error().stack.split('\n')[1].trim()
+    stackTrace: new Error().stack.split("\n")[1].trim(),
   });
 
   this.questions.push({
@@ -423,7 +496,8 @@ interviewSchema.methods.addQuestion = function (questionData) {
 interviewSchema.methods.updateAnswer = function (
   questionId,
   answer,
-  timeSpent
+  timeSpent,
+  sentiment = "NEUTRAL"
 ) {
   const question = this.questions.find((q) => q.questionId === questionId);
   if (question) {
@@ -431,6 +505,8 @@ interviewSchema.methods.updateAnswer = function (
     question.timeSpent = timeSpent || 0;
     question.answeredAt = new Date();
     question.isAnswered = true;
+    question.sentiment = sentiment; // NEW: Update sentiment
+    question.sentimentAnalyzedAt = new Date(); // NEW: Update sentiment analyzed time
 
     // Update overall stats
     this.overallAnalysis.answeredQuestions = this.questions.filter(
@@ -507,6 +583,54 @@ interviewSchema.methods.calculateOverallAnalysis = function () {
   }
 
   this.overallAnalysis.answeredQuestions = answeredQuestions.length;
+};
+
+// Instance method to update proctoring data
+interviewSchema.methods.updateProctoringData = function (proctoringUpdates) {
+  if (!this.proctoringData) {
+    this.proctoringData = {
+      tabSwitches: 0,
+      copyPasteCount: 0,
+      faceDetectionIssues: 0,
+      multiplePersonDetections: 0,
+      phoneDetections: 0,
+      lastTabSwitchAt: null,
+      lastViolationAt: null,
+    };
+  }
+
+  // Update tab switches
+  if (proctoringUpdates.tabSwitches !== undefined) {
+    this.proctoringData.tabSwitches = proctoringUpdates.tabSwitches;
+    this.proctoringData.lastTabSwitchAt = new Date();
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update copy/paste count
+  if (proctoringUpdates.copyPasteCount !== undefined) {
+    this.proctoringData.copyPasteCount = proctoringUpdates.copyPasteCount;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update face detection issues
+  if (proctoringUpdates.faceDetectionIssues !== undefined) {
+    this.proctoringData.faceDetectionIssues = proctoringUpdates.faceDetectionIssues;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update multiple person detections
+  if (proctoringUpdates.multiplePersonDetections !== undefined) {
+    this.proctoringData.multiplePersonDetections = proctoringUpdates.multiplePersonDetections;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  // Update phone detections
+  if (proctoringUpdates.phoneDetections !== undefined) {
+    this.proctoringData.phoneDetections = proctoringUpdates.phoneDetections;
+    this.proctoringData.lastViolationAt = new Date();
+  }
+
+  return this.save();
 };
 
 // Helper method to calculate rating variance
