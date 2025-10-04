@@ -2,6 +2,8 @@
 const analyzeAnswer = require("./analyzeAnswer");
 const generateFollowUpQuestion = require("./generateFollowUpQuestion");
 const generateIntroductionQuestion = require("./generateIntroductionQuestion");
+const rephraseQuestionWithWarning = require("./rephraseQuestionWithWarning");
+const rephraseQuestionWithPersonalization = require("./rephraseQuestionWithPersonalization");
 
 // Create a class-like structure for backward compatibility
 class AnalysisService {
@@ -26,6 +28,22 @@ class AnalysisService {
   static async generateIntroductionQuestion(interview, candidateName) {
     return await generateIntroductionQuestion(interview, candidateName);
   }
+
+  static async rephraseQuestionWithWarning(originalQuestion, sentiment) {
+    return await rephraseQuestionWithWarning(originalQuestion, sentiment);
+  }
+
+  static async rephraseQuestionWithPersonalization(
+    originalQuestion,
+    previousAnswer,
+    sentiment
+  ) {
+    return await rephraseQuestionWithPersonalization(
+      originalQuestion,
+      previousAnswer,
+      sentiment
+    );
+  }
 }
 
 // Export both the class and individual functions
@@ -33,6 +51,6 @@ module.exports = AnalysisService;
 module.exports.analyzeAnswer = analyzeAnswer;
 module.exports.generateFollowUpQuestion = generateFollowUpQuestion;
 module.exports.generateIntroductionQuestion = generateIntroductionQuestion;
-
-
-
+module.exports.rephraseQuestionWithWarning = rephraseQuestionWithWarning;
+module.exports.rephraseQuestionWithPersonalization =
+  rephraseQuestionWithPersonalization;

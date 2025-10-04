@@ -238,8 +238,38 @@ const interviewSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+        // Sentiment analysis for this specific question
+        sentiment: {
+          type: String,
+          enum: ["POSITIVE", "NEGATIVE", "NEUTRAL"],
+          default: "NEUTRAL",
+        },
+        sentimentAnalyzedAt: {
+          type: Date,
+          default: null,
+        },
       },
     ],
+    // Warning System
+    warningCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 2,
+    },
+    lastWarningAt: {
+      type: Date,
+      default: null,
+    },
+    isTerminated: {
+      type: Boolean,
+      default: false,
+    },
+    terminationReason: {
+      type: String,
+      default: "",
+      maxlength: [500, "Termination reason cannot be more than 500 characters"],
+    },
     // Overall Interview Analysis
     overallAnalysis: {
       totalQuestions: {
@@ -408,7 +438,7 @@ interviewSchema.methods.addQuestion = function (questionData) {
     questionId: questionData.questionId,
     questionType: questionData.questionType || "pool",
     currentQuestionCount: this.questions.length,
-    stackTrace: new Error().stack.split('\n')[1].trim()
+    stackTrace: new Error().stack.split("\n")[1].trim(),
   });
 
   this.questions.push({
@@ -423,7 +453,8 @@ interviewSchema.methods.addQuestion = function (questionData) {
 interviewSchema.methods.updateAnswer = function (
   questionId,
   answer,
-  timeSpent
+  timeSpent,
+  sentiment = "NEUTRAL"
 ) {
   const question = this.questions.find((q) => q.questionId === questionId);
   if (question) {
@@ -431,6 +462,8 @@ interviewSchema.methods.updateAnswer = function (
     question.timeSpent = timeSpent || 0;
     question.answeredAt = new Date();
     question.isAnswered = true;
+    question.sentiment = sentiment; // NEW: Update sentiment
+    question.sentimentAnalyzedAt = new Date(); // NEW: Update sentiment analyzed time
 
     // Update overall stats
     this.overallAnalysis.answeredQuestions = this.questions.filter(
