@@ -23,6 +23,7 @@ const authRoutes = require("./routes/auth");
 const resumeRoutes = require("./routes/resume");
 const interviewRoutes = require("./routes/interview");
 const interviewerRoutes = require("./routes/interviewer");
+const ttsRoutes = require("./routes/tts");
 
 // Import database
 const database = require("./config/database");
@@ -76,6 +77,17 @@ app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/interview", interviewRoutes);
 app.use("/api/interviewers", interviewerRoutes);
+app.use("/api/tts", ttsRoutes);
+
+// Serve static files for uploads (audio/voice files)
+app.use("/uploads", express.static("uploads"));
+
+// Serve test HTML file (development only)
+if (process.env.NODE_ENV === "development" || !process.env.NODE_ENV) {
+  app.get("/test-audio", (req, res) => {
+    res.sendFile(require('path').join(__dirname, "../test-audio-playback.html"));
+  });
+}
 
 // Root endpoint
 app.get("/", (req, res) => {

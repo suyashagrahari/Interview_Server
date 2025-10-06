@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Playback Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Audio Playback Test</h1>
+
+    <div class="test-section">
+        <h2>Test 1: Direct URL</h2>
+        <audio id="audio1" controls>
+            <source src="/uploads/voice/user-user123-question-question789-1759663204048.mp3" type="audio/mpeg">
+        </audio>
+        <div class="log" id="log1"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Blob from Base64</h2>
+        <button onclick="loadAndPlayBlob()">Load & Play</button>
+        <audio id="audio2" controls></audio>
+        <div class="log" id="log2"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Fetch and Play</h2>
+        <button onclick="fetchAndPlay()">Fetch & Play</button>
+        <audio id="audio3" controls></audio>
+        <div class="log" id="log3"></div>
+    </div>
+
+    <script>
+        function log(section, message) {
+            const logDiv = document.getElementById(`log${section}`);
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Test 1: Direct URL - just log events
+        const audio1 = document.getElementById('audio1');
+        audio1.addEventListener('loadstart', () => log(1, '🎬 Load started'));
+        audio1.addEventListener('loadedmetadata', () => log(1, `📊 Metadata loaded, duration: ${audio1.duration}s`));
+        audio1.addEventListener('loadeddata', () => log(1, '📥 Data loaded'));
+        audio1.addEventListener('canplay', () => log(1, '▶️ Can play'));
+        audio1.addEventListener('canplaythrough', () => log(1, '✅ Can play through'));
+        audio1.addEventListener('playing', () => log(1, '🔊 Playing'));
+        audio1.addEventListener('ended', () => log(1, '🏁 Ended'));
+        audio1.addEventListener('error', (e) => {
+            log(1, `❌ Error: ${e.target.error?.code} - ${e.target.error?.message}`);
+        });
+
+        // Test 2: Blob from Base64
+        async function loadAndPlayBlob() {
+            try {
+                log(2, '🔄 Fetching audio...');
+                const response = await fetch('/uploads/voice/user-user123-question-question789-1759663204048.mp3');
+                const arrayBuffer = await response.arrayBuffer();
+
+                log(2, `📦 Fetched ${arrayBuffer.byteLength} bytes`);
+
+                const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+                log(2, `📦 Created blob, size: ${blob.size} bytes`);
+
+                const blobUrl = URL.createObjectURL(blob);
+                log(2, `✅ Created blob URL: ${blobUrl.substring(0, 50)}...`);
+
+                const audio2 = document.getElementById('audio2');
+                audio2.src = blobUrl;
+
+                audio2.addEventListener('loadedmetadata', () => log(2, `📊 Duration: ${audio2.duration}s`));
+                audio2.addEventListener('canplay', () => log(2, '▶️ Can play'));
+                audio2.addEventListener('error', (e) => {
+                    log(2, `❌ Error: ${e.target.error?.code} - ${e.target.error?.message}`);
+                });
+
+                await audio2.play();
+                log(2, '🔊 Playing...');
+            } catch (error) {
+                log(2, `❌ Error: ${error.message}`);
+            }
+        }
+
+        // Test 3: Fetch and create ArrayBuffer
+        async function fetchAndPlay() {
+            try {
+                log(3, '🔄 Fetching audio...');
+                const response = await fetch('/uploads/voice/user-user123-question-question789-1759663204048.mp3');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                log(3, `📦 Fetched blob, size: ${blob.size} bytes, type: ${blob.type}`);
+
+                const audio3 = document.getElementById('audio3');
+                audio3.src = URL.createObjectURL(blob);
+
+                audio3.addEventListener('loadedmetadata', () => log(3, `📊 Duration: ${audio3.duration}s`));
+                audio3.addEventListener('canplay', () => log(3, '▶️ Can play'));
+                audio3.addEventListener('error', (e) => {
+                    log(3, `❌ Error: ${e.target.error?.code} - ${e.target.error?.message}`);
+                });
+
+                await audio3.play();
+                log(3, '🔊 Playing...');
+            } catch (error) {
+                log(3, `❌ Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
