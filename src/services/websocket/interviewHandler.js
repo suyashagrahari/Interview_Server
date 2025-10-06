@@ -3,6 +3,7 @@ const QuestionPool = require("../../models/QuestionPool");
 const QuestionManagementService = require("../questionManagementService");
 const AnalysisService = require("../analysisService");
 const sentimentAnalysisService = require("../sentimentAnalysisService");
+const ttsService = require("../ttsService");
 const logger = require("../../utils/logger");
 
 /**
@@ -75,7 +76,32 @@ class InterviewHandlerService {
       // SECURITY: Remove expectedAnswer from response
       const { expectedAnswer, ...questionWithoutAnswer } = result.data.question;
 
-      // Emit question to client (without expectedAnswer)
+      // Generate TTS audio for the question
+      let audioData = null;
+      try {
+        const audioResult = await ttsService.generateSpeechStream(
+          questionWithoutAnswer.question,
+          null, // Let the service generate the filename
+          effectiveUserId, // Pass userId for cleanup
+          result.data.question.questionId // Pass questionId
+        );
+
+        if (audioResult.success) {
+          audioData = {
+            audioBase64: audioResult.audioBase64,
+            url: audioResult.url,
+            fileName: audioResult.fileName,
+            mimeType: "audio/mpeg",
+          };
+          logger.info(`✅ TTS audio generated: ${audioResult.fileName}, base64 length: ${audioResult.audioBase64?.length || 0}`);
+        } else {
+          logger.warn(`⚠️ TTS generation failed: ${audioResult.message}`);
+        }
+      } catch (audioError) {
+        logger.error("Error generating TTS audio:", audioError);
+      }
+
+      // Emit question to client (without expectedAnswer) with audio
       socket.emit("question:first", {
         success: true,
         message: "First question generated successfully",
@@ -83,11 +109,12 @@ class InterviewHandlerService {
           question: questionWithoutAnswer,
           interviewId: result.data.interviewId,
           questionNumber: result.data.questionNumber,
+          audio: audioData,
         },
       });
 
       logger.info(
-        `✅ First question emitted to user ${userId} (question ID: ${result.data.question.questionId})`
+        `✅ First question emitted to user ${userId} (question ID: ${result.data.question.questionId}) with ${audioData ? 'audio' : 'no audio'}`
       );
     } catch (error) {
       logger.error("Error generating first question:", error);
@@ -488,7 +515,32 @@ class InterviewHandlerService {
         // SECURITY: Remove expectedAnswer from response
         const { expectedAnswer, ...questionWithoutAnswer } = nextQuestion;
 
-        // Emit next question to client (without expectedAnswer)
+        // Generate TTS audio for the next question
+        let audioData = null;
+        try {
+          const audioResult = await ttsService.generateSpeechStream(
+            questionWithoutAnswer.question,
+            null, // Let the service generate the filename
+            userId, // Pass userId for cleanup (this is the actual userId passed to this function)
+            nextQuestion.questionId // Pass questionId
+          );
+
+          if (audioResult.success) {
+            audioData = {
+              audioBase64: audioResult.audioBase64,
+              url: audioResult.url,
+              fileName: audioResult.fileName,
+              mimeType: "audio/mpeg",
+            };
+            logger.info(`✅ TTS audio generated for next question: ${audioResult.fileName}, base64 length: ${audioResult.audioBase64?.length || 0}`);
+          } else {
+            logger.warn(`⚠️ TTS generation failed for next question: ${audioResult.message}`);
+          }
+        } catch (audioError) {
+          logger.error("Error generating TTS audio for next question:", audioError);
+        }
+
+        // Emit next question to client (without expectedAnswer) with audio
         socket.emit("question:next", {
           success: true,
           message: "Next question generated successfully",
@@ -497,11 +549,12 @@ class InterviewHandlerService {
             questionNumber: currentQuestionNumber + 1,
             totalQuestionsAsked: interview.questions.length,
             isInterviewComplete: false,
+            audio: audioData,
           },
         });
 
         logger.info(
-          `✅ Next question emitted (question ID: ${nextQuestion.questionId})`
+          `✅ Next question emitted (question ID: ${nextQuestion.questionId}) with ${audioData ? 'audio' : 'no audio'}`
         );
       } else {
         // No more questions, interview complete
