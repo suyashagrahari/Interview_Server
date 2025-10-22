@@ -1,4 +1,5 @@
 const { ResumeInterview, logger } = require("./dependencies");
+const InterviewStateService = require("../interviewStateService");
 
 /**
  * End interview and calculate final analysis
@@ -25,6 +26,17 @@ const endInterview = async (interviewId, userId) => {
     await interview.calculateOverallAnalysis();
 
     logger.info(`Interview ${interviewId} ended by user ${userId}`);
+
+    // Clear user's active interview state
+    try {
+      await InterviewStateService.markInterviewCompleted(userId, interviewId);
+      logger.info(
+        `User interview state cleared for user ${userId}, interview ${interviewId}`
+      );
+    } catch (stateError) {
+      // Log error but don't fail the interview ending
+      logger.error("Error clearing user interview state:", stateError);
+    }
 
     return {
       success: true,

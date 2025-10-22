@@ -1,4 +1,5 @@
 const { ResumeInterview, logger } = require("./dependencies");
+const InterviewStateService = require("../interviewStateService");
 
 /**
  * Create new interview
@@ -57,6 +58,26 @@ const createInterview = async (userId, interviewData) => {
 
     await interview.save();
     logger.info(`Interview created for user ${userId}: ${interview._id}`);
+
+    // Update user interview state for cross-device tracking
+    if (!scheduled) {
+      try {
+        await InterviewStateService.updateUserInterviewState(userId, {
+          interviewId: interview._id,
+          status: interview.status,
+          startedAt: interview.startedAt,
+          completedAt: null,
+          currentQuestionNumber: 0,
+          totalQuestions: 0,
+          timeRemaining: interview.timeRemaining || 2700, // 45 minutes
+          interviewType: "resume-based",
+        });
+        logger.info(`User interview state updated for user ${userId}`);
+      } catch (stateError) {
+        // Log error but don't fail the interview creation
+        logger.error("Error updating user interview state:", stateError);
+      }
+    }
 
     return {
       success: true,

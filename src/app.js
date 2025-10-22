@@ -22,6 +22,7 @@ const { errorHandler, notFound } = require("./middleware/errorHandler");
 const authRoutes = require("./routes/auth");
 const resumeRoutes = require("./routes/resume");
 const interviewRoutes = require("./routes/interview");
+const resumeBasedInterviewRoutes = require("./routes/resumeBasedInterview");
 const interviewerRoutes = require("./routes/interviewer");
 const ttsRoutes = require("./routes/tts");
 
@@ -75,7 +76,8 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
-app.use("/api/interview", interviewRoutes);
+app.use("/api/interview", interviewRoutes); // Legacy route - keep for backward compatibility
+app.use("/api/resume-based-interview", resumeBasedInterviewRoutes); // New resume-based interview routes
 app.use("/api/interviewers", interviewerRoutes);
 app.use("/api/tts", ttsRoutes);
 
