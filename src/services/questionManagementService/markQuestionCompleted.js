@@ -1,4 +1,4 @@
-const { QuestionPool, logger } = require("./dependencies");
+const { ResumeQuestionPool, logger } = require("./dependencies");
 
 /**
  * Mark question as completed in question pool
@@ -9,7 +9,7 @@ const { QuestionPool, logger } = require("./dependencies");
  */
 const markQuestionCompleted = async (interviewId, userId, questionId) => {
   try {
-    const questionPool = await QuestionPool.findOne({
+    const questionPool = await ResumeQuestionPool.findOne({
       interviewId: interviewId,
       userId: userId,
     });

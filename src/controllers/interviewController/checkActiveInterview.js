@@ -1,4 +1,4 @@
-const Interview = require("../../models/Interview");
+const ResumeInterview = require("../../models/Interview");
 
 const checkActiveInterview = async (req, res) => {
   try {
@@ -7,7 +7,7 @@ const checkActiveInterview = async (req, res) => {
     console.log("User ID:", userId);
 
     // Find active interview for this user
-    const activeInterview = await Interview.findOne({
+    const activeInterview = await ResumeInterview.findOne({
       candidateId: userId,
       status: "in_progress",
       completedAt: null,

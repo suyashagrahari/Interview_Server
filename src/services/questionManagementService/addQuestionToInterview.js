@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * Add question to interview
@@ -9,7 +9,7 @@ const { Interview, logger } = require("./dependencies");
  */
 const addQuestionToInterview = async (interviewId, userId, questionData) => {
   try {
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,

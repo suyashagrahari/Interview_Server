@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * Get user interviews with pagination
@@ -17,12 +17,12 @@ const getUserInterviews = async (userId, options = {}) => {
     }
 
     const [interviews, totalInterviews] = await Promise.all([
-      Interview.find(query)
+      ResumeInterview.find(query)
         .populate("resumeId", "resumeName originalFileName")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
-      Interview.countDocuments(query),
+      ResumeInterview.countDocuments(query),
     ]);
 
     const interviewList = interviews.map((interview) => ({

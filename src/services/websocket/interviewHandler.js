@@ -1,5 +1,5 @@
-const Interview = require("../../models/Interview");
-const QuestionPool = require("../../models/QuestionPool");
+const ResumeInterview = require("../../models/Interview");
+const ResumeQuestionPool = require("../../models/QuestionPool");
 const QuestionManagementService = require("../questionManagementService");
 const AnalysisService = require("../analysisService");
 const sentimentAnalysisService = require("../sentimentAnalysisService");
@@ -51,7 +51,7 @@ class InterviewHandlerService {
       let effectiveUserId = userId;
       if (userId && userId.startsWith('interview-')) {
         logger.info('⚠️ Fallback userId detected, fetching actual candidateId from interview');
-        const interview = await Interview.findById(interviewId);
+        const interview = await ResumeInterview.findById(interviewId);
         if (interview) {
           effectiveUserId = interview.candidateId.toString();
           logger.info(`✅ Using actual candidateId: ${effectiveUserId}`);
@@ -145,7 +145,7 @@ class InterviewHandlerService {
       let effectiveUserId = userId;
       if (userId && userId.startsWith('interview-')) {
         logger.info('⚠️ Fallback userId detected, fetching actual candidateId from interview');
-        const tempInterview = await Interview.findById(interviewId);
+        const tempInterview = await ResumeInterview.findById(interviewId);
         if (tempInterview) {
           effectiveUserId = tempInterview.candidateId.toString();
           logger.info(`✅ Using actual candidateId: ${effectiveUserId}`);
@@ -173,7 +173,7 @@ class InterviewHandlerService {
       });
 
       // Find the interview
-      const interview = await Interview.findOne({
+      const interview = await ResumeInterview.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,
@@ -462,7 +462,7 @@ class InterviewHandlerService {
           (interview.questions.length + 1) / 2
         );
 
-        const questionPool = await QuestionPool.findOne({
+        const questionPool = await ResumeQuestionPool.findOne({
           interviewId: interview._id,
           userId: interview.candidateId,
         });
@@ -588,14 +588,14 @@ class InterviewHandlerService {
       let effectiveUserId = userId;
       if (userId && userId.startsWith('interview-')) {
         logger.info('⚠️ Fallback userId detected, fetching actual candidateId from interview');
-        const tempInterview = await Interview.findById(interviewId);
+        const tempInterview = await ResumeInterview.findById(interviewId);
         if (tempInterview) {
           effectiveUserId = tempInterview.candidateId.toString();
           logger.info(`✅ Using actual candidateId: ${effectiveUserId}`);
         }
       }
 
-      const interview = await Interview.findOne({
+      const interview = await ResumeInterview.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,
@@ -682,13 +682,13 @@ class InterviewHandlerService {
       // If userId is a fallback, fetch actual candidateId
       let effectiveUserId = userId;
       if (userId && userId.startsWith('interview-')) {
-        const tempInterview = await Interview.findById(interviewId);
+        const tempInterview = await ResumeInterview.findById(interviewId);
         if (tempInterview) {
           effectiveUserId = tempInterview.candidateId.toString();
         }
       }
 
-      const interview = await Interview.findOne({
+      const interview = await ResumeInterview.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,
@@ -734,13 +734,13 @@ class InterviewHandlerService {
       // If userId is a fallback, fetch actual candidateId
       let effectiveUserId = userId;
       if (userId && userId.startsWith('interview-')) {
-        const tempInterview = await Interview.findById(interviewId);
+        const tempInterview = await ResumeInterview.findById(interviewId);
         if (tempInterview) {
           effectiveUserId = tempInterview.candidateId.toString();
         }
       }
 
-      const interview = await Interview.findOne({
+      const interview = await ResumeInterview.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,

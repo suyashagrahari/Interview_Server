@@ -1,4 +1,4 @@
-const Interview = require("../../models/Interview");
+const ResumeInterview = require("../../models/Interview");
 
 class InterviewTimerService {
   constructor(io) {
@@ -18,7 +18,7 @@ class InterviewTimerService {
     // Update time every second
     const intervalId = setInterval(async () => {
       try {
-        const interview = await Interview.findById(interviewId);
+        const interview = await ResumeInterview.findById(interviewId);
 
         if (!interview || interview.status !== "in_progress") {
           console.log(`⏹️  Stopping timer for interview ${interviewId} - not active`);
@@ -88,7 +88,7 @@ class InterviewTimerService {
    */
   async getTimeRemaining(interviewId) {
     try {
-      const interview = await Interview.findById(interviewId);
+      const interview = await ResumeInterview.findById(interviewId);
 
       if (!interview || !interview.startedAt) {
         return { success: false, timeRemaining: 0 };

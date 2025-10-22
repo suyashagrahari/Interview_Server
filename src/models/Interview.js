@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const interviewSchema = new mongoose.Schema(
+const resumeInterviewSchema = new mongoose.Schema(
   {
     candidateId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -377,13 +377,13 @@ const interviewSchema = new mongoose.Schema(
 );
 
 // Indexes for better performance
-interviewSchema.index({ candidateId: 1, status: 1 });
-interviewSchema.index({ createdAt: -1 });
-interviewSchema.index({ startedAt: -1 });
-interviewSchema.index({ status: 1, scheduledDate: 1 });
+resumeInterviewSchema.index({ candidateId: 1, status: 1 });
+resumeInterviewSchema.index({ createdAt: -1 });
+resumeInterviewSchema.index({ startedAt: -1 });
+resumeInterviewSchema.index({ status: 1, scheduledDate: 1 });
 
 // Virtual for candidate information
-interviewSchema.virtual("candidate", {
+resumeInterviewSchema.virtual("candidate", {
   ref: "User",
   localField: "candidateId",
   foreignField: "_id",
@@ -391,7 +391,7 @@ interviewSchema.virtual("candidate", {
 });
 
 // Virtual for resume information
-interviewSchema.virtual("resume", {
+resumeInterviewSchema.virtual("resume", {
   ref: "Resume",
   localField: "resumeId",
   foreignField: "_id",
@@ -399,7 +399,7 @@ interviewSchema.virtual("resume", {
 });
 
 // Virtual for interview duration
-interviewSchema.virtual("duration").get(function () {
+resumeInterviewSchema.virtual("duration").get(function () {
   if (this.startedAt && this.completedAt) {
     return Math.round((this.completedAt - this.startedAt) / 1000 / 60); // in minutes
   }
@@ -407,7 +407,7 @@ interviewSchema.virtual("duration").get(function () {
 });
 
 // Static method to find interviews by candidate
-interviewSchema.statics.findByCandidate = function (
+resumeInterviewSchema.statics.findByCandidate = function (
   candidateId,
   includeInactive = false
 ) {
@@ -419,7 +419,7 @@ interviewSchema.statics.findByCandidate = function (
 };
 
 // Static method to find interviews by status
-interviewSchema.statics.findByStatus = function (
+resumeInterviewSchema.statics.findByStatus = function (
   status,
   includeInactive = false
 ) {
@@ -431,7 +431,7 @@ interviewSchema.statics.findByStatus = function (
 };
 
 // Static method to find active interviews
-interviewSchema.statics.findActiveInterviews = function () {
+resumeInterviewSchema.statics.findActiveInterviews = function () {
   return this.find({
     status: { $in: ["scheduled", "in_progress"] },
     isActive: true,
@@ -439,14 +439,14 @@ interviewSchema.statics.findActiveInterviews = function () {
 };
 
 // Instance method to start interview
-interviewSchema.methods.startInterview = function () {
+resumeInterviewSchema.methods.startInterview = function () {
   this.status = "in_progress";
   this.startedAt = new Date();
   return this.save();
 };
 
 // Instance method to complete interview
-interviewSchema.methods.completeInterview = function () {
+resumeInterviewSchema.methods.completeInterview = function () {
   this.status = "completed";
   this.completedAt = new Date();
   if (this.startedAt) {
@@ -458,25 +458,25 @@ interviewSchema.methods.completeInterview = function () {
 };
 
 // Instance method to pause interview
-interviewSchema.methods.pauseInterview = function () {
+resumeInterviewSchema.methods.pauseInterview = function () {
   this.status = "paused";
   return this.save();
 };
 
 // Instance method to resume interview
-interviewSchema.methods.resumeInterview = function () {
+resumeInterviewSchema.methods.resumeInterview = function () {
   this.status = "in_progress";
   return this.save();
 };
 
 // Instance method to cancel interview
-interviewSchema.methods.cancelInterview = function () {
+resumeInterviewSchema.methods.cancelInterview = function () {
   this.status = "cancelled";
   return this.save();
 };
 
 // Instance method to add question
-interviewSchema.methods.addQuestion = function (questionData) {
+resumeInterviewSchema.methods.addQuestion = function (questionData) {
   console.log(`🔍 DEBUG: Adding question to interview ${this._id}:`, {
     questionId: questionData.questionId,
     questionType: questionData.questionType || "pool",
@@ -493,7 +493,7 @@ interviewSchema.methods.addQuestion = function (questionData) {
 };
 
 // Instance method to update answer
-interviewSchema.methods.updateAnswer = function (
+resumeInterviewSchema.methods.updateAnswer = function (
   questionId,
   answer,
   timeSpent,
@@ -519,7 +519,10 @@ interviewSchema.methods.updateAnswer = function (
 };
 
 // Instance method to update answer analysis
-interviewSchema.methods.updateAnswerAnalysis = function (questionId, analysis) {
+resumeInterviewSchema.methods.updateAnswerAnalysis = function (
+  questionId,
+  analysis
+) {
   const question = this.questions.find((q) => q.questionId === questionId);
   if (question) {
     question.answerAnalysis = { ...question.answerAnalysis, ...analysis };
@@ -533,7 +536,7 @@ interviewSchema.methods.updateAnswerAnalysis = function (questionId, analysis) {
 };
 
 // Instance method to calculate overall analysis
-interviewSchema.methods.calculateOverallAnalysis = function () {
+resumeInterviewSchema.methods.calculateOverallAnalysis = function () {
   const answeredQuestions = this.questions.filter(
     (q) => q.isAnswered && q.answerAnalysis.overallRating > 0
   );
@@ -586,7 +589,9 @@ interviewSchema.methods.calculateOverallAnalysis = function () {
 };
 
 // Instance method to update proctoring data
-interviewSchema.methods.updateProctoringData = function (proctoringUpdates) {
+resumeInterviewSchema.methods.updateProctoringData = function (
+  proctoringUpdates
+) {
   if (!this.proctoringData) {
     this.proctoringData = {
       tabSwitches: 0,
@@ -614,13 +619,15 @@ interviewSchema.methods.updateProctoringData = function (proctoringUpdates) {
 
   // Update face detection issues
   if (proctoringUpdates.faceDetectionIssues !== undefined) {
-    this.proctoringData.faceDetectionIssues = proctoringUpdates.faceDetectionIssues;
+    this.proctoringData.faceDetectionIssues =
+      proctoringUpdates.faceDetectionIssues;
     this.proctoringData.lastViolationAt = new Date();
   }
 
   // Update multiple person detections
   if (proctoringUpdates.multiplePersonDetections !== undefined) {
-    this.proctoringData.multiplePersonDetections = proctoringUpdates.multiplePersonDetections;
+    this.proctoringData.multiplePersonDetections =
+      proctoringUpdates.multiplePersonDetections;
     this.proctoringData.lastViolationAt = new Date();
   }
 
@@ -634,7 +641,9 @@ interviewSchema.methods.updateProctoringData = function (proctoringUpdates) {
 };
 
 // Helper method to calculate rating variance
-interviewSchema.methods.calculateRatingVariance = function (answeredQuestions) {
+resumeInterviewSchema.methods.calculateRatingVariance = function (
+  answeredQuestions
+) {
   if (answeredQuestions.length < 2) return 0;
 
   const ratings = answeredQuestions.map((q) => q.answerAnalysis.overallRating);
@@ -648,7 +657,7 @@ interviewSchema.methods.calculateRatingVariance = function (answeredQuestions) {
 };
 
 // Pre-save middleware to update timestamps
-interviewSchema.pre("save", function (next) {
+resumeInterviewSchema.pre("save", function (next) {
   if (this.isModified("status")) {
     if (this.status === "in_progress" && !this.startedAt) {
       this.startedAt = new Date();
@@ -664,4 +673,4 @@ interviewSchema.pre("save", function (next) {
   next();
 });
 
-module.exports = mongoose.model("Interview", interviewSchema);
+module.exports = mongoose.model("ResumeInterview", resumeInterviewSchema);

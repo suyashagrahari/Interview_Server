@@ -1,5 +1,5 @@
 const {
-  Interview,
+  ResumeInterview,
   QuestionManagementService,
   AnalysisService,
   sendAuthRequiredError,
@@ -37,7 +37,7 @@ const submitAnswer = async (req, res) => {
     } = req.body;
 
     // Find the interview
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: req.params.id,
       candidateId: req.user.id,
       isActive: true,
@@ -215,8 +215,8 @@ const submitAnswer = async (req, res) => {
         );
 
         // Get question pool
-        const QuestionPool = require("../../models/QuestionPool");
-        const questionPool = await QuestionPool.findOne({
+        const ResumeQuestionPool = require("../../models/QuestionPool");
+        const questionPool = await ResumeQuestionPool.findOne({
           interviewId: interview._id,
           userId: interview.candidateId,
         });

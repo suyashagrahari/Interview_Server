@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * Get interview by ID
@@ -8,7 +8,7 @@ const { Interview, logger } = require("./dependencies");
  */
 const getInterviewById = async (interviewId, userId) => {
   try {
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,

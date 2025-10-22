@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * Update answer analysis
@@ -15,7 +15,7 @@ const updateAnswerAnalysis = async (
   analysis
 ) => {
   try {
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,

@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * Check if user has active interview
@@ -7,7 +7,7 @@ const { Interview, logger } = require("./dependencies");
  */
 const checkActiveInterview = async (userId) => {
   try {
-    const existingInterview = await Interview.findOne({
+    const existingInterview = await ResumeInterview.findOne({
       candidateId: userId,
       status: { $in: ["in_progress"] },
       isActive: true,

@@ -1,11 +1,11 @@
 // Shared dependencies for all question management service functions
-const QuestionPool = require("../../models/QuestionPool");
-const Interview = require("../../models/Interview");
+const ResumeQuestionPool = require("../../models/QuestionPool");
+const ResumeInterview = require("../../models/Interview");
 const logger = require("../../utils/logger");
 
 module.exports = {
-  QuestionPool,
-  Interview,
+  ResumeQuestionPool,
+  ResumeInterview,
   logger,
 };
 

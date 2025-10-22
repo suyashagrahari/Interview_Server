@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const questionPoolSchema = new mongoose.Schema(
+const resumeQuestionPoolSchema = new mongoose.Schema(
   {
     // References
     resumeId: {
@@ -124,29 +124,29 @@ const questionPoolSchema = new mongoose.Schema(
 );
 
 // Indexes for better query performance
-questionPoolSchema.index({ resumeId: 1 });
-questionPoolSchema.index({ interviewId: 1 });
-questionPoolSchema.index({ userId: 1 });
-questionPoolSchema.index({ interviewType: 1, level: 1, difficultyLevel: 1 });
-questionPoolSchema.index({ createdAt: -1 });
+resumeQuestionPoolSchema.index({ resumeId: 1 });
+resumeQuestionPoolSchema.index({ interviewId: 1 });
+resumeQuestionPoolSchema.index({ userId: 1 });
+resumeQuestionPoolSchema.index({ interviewType: 1, level: 1, difficultyLevel: 1 });
+resumeQuestionPoolSchema.index({ createdAt: -1 });
 
 // Virtual for question count
-questionPoolSchema.virtual("questionCount").get(function () {
+resumeQuestionPoolSchema.virtual("questionCount").get(function () {
   return this.questions ? this.questions.length : 0;
 });
 
 // Static method to find question pool by interview
-questionPoolSchema.statics.findByInterview = function (interviewId) {
+resumeQuestionPoolSchema.statics.findByInterview = function (interviewId) {
   return this.findOne({ interviewId }).sort({ createdAt: -1 });
 };
 
 // Static method to find question pool by resume
-questionPoolSchema.statics.findByResume = function (resumeId) {
+resumeQuestionPoolSchema.statics.findByResume = function (resumeId) {
   return this.findOne({ resumeId }).sort({ createdAt: -1 });
 };
 
 // Static method to find question pools by user
-questionPoolSchema.statics.findByUser = function (userId, limit = 10) {
+resumeQuestionPoolSchema.statics.findByUser = function (userId, limit = 10) {
   return this.find({ userId })
     .populate("resumeId", "resumeName")
     .populate("interviewId", "jobRole interviewType level difficultyLevel")
@@ -155,18 +155,18 @@ questionPoolSchema.statics.findByUser = function (userId, limit = 10) {
 };
 
 // Instance method to get question by ID
-questionPoolSchema.methods.getQuestionById = function (questionId) {
+resumeQuestionPoolSchema.methods.getQuestionById = function (questionId) {
   return this.questions.find((q) => q.questionId === questionId);
 };
 
 // Instance method to add question
-questionPoolSchema.methods.addQuestion = function (questionData) {
+resumeQuestionPoolSchema.methods.addQuestion = function (questionData) {
   this.questions.push(questionData);
   return this.save();
 };
 
 // Instance method to update question
-questionPoolSchema.methods.updateQuestion = function (questionId, updateData) {
+resumeQuestionPoolSchema.methods.updateQuestion = function (questionId, updateData) {
   const question = this.questions.find((q) => q.questionId === questionId);
   if (question) {
     Object.assign(question, updateData);
@@ -176,13 +176,13 @@ questionPoolSchema.methods.updateQuestion = function (questionId, updateData) {
 };
 
 // Instance method to remove question
-questionPoolSchema.methods.removeQuestion = function (questionId) {
+resumeQuestionPoolSchema.methods.removeQuestion = function (questionId) {
   this.questions = this.questions.filter((q) => q.questionId !== questionId);
   return this.save();
 };
 
 // Instance method to mark question as completed
-questionPoolSchema.methods.markQuestionCompleted = function (questionId) {
+resumeQuestionPoolSchema.methods.markQuestionCompleted = function (questionId) {
   const question = this.questions.find((q) => q.questionId === questionId);
   if (question) {
     question.isCompleted = true;
@@ -193,7 +193,7 @@ questionPoolSchema.methods.markQuestionCompleted = function (questionId) {
 };
 
 // Instance method to mark question as asked
-questionPoolSchema.methods.markQuestionAsked = function (questionId) {
+resumeQuestionPoolSchema.methods.markQuestionAsked = function (questionId) {
   const question = this.questions.find((q) => q.questionId === questionId);
   if (question) {
     question.isAsked = true;
@@ -204,9 +204,9 @@ questionPoolSchema.methods.markQuestionAsked = function (questionId) {
 };
 
 // Pre-save middleware to update updatedAt
-questionPoolSchema.pre("save", function (next) {
+resumeQuestionPoolSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();
 });
 
-module.exports = mongoose.model("QuestionPool", questionPoolSchema);
+module.exports = mongoose.model("ResumeQuestionPool", resumeQuestionPoolSchema);

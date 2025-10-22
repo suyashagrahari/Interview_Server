@@ -1,5 +1,5 @@
-const { QuestionPool, chatGPTService, logger } = require("./dependencies");
-const Interview = require("../../models/Interview");
+const { ResumeQuestionPool, chatGPTService, logger } = require("./dependencies");
+const ResumeInterview = require("../../models/Interview");
 /**
  * Generate questions for an interview based on resume
  * @param {string} interviewId - Interview ID
@@ -10,7 +10,7 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
   try {
     // Get interview details
 
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,
@@ -24,7 +24,7 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
     }
 
     // Check if questions already exist for this interview
-    const existingQuestionPool = await QuestionPool.findOne({
+    const existingQuestionPool = await ResumeQuestionPool.findOne({
       interviewId: interviewId,
     });
 
@@ -65,7 +65,7 @@ const generateQuestionsForInterview = async (interviewId, userId) => {
     }
 
     // Create question pool
-    const questionPool = new QuestionPool({
+    const questionPool = new ResumeQuestionPool({
       resumeId: interview.resumeId._id,
       interviewId: interviewId,
       userId: userId,

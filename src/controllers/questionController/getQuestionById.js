@@ -1,4 +1,4 @@
-const { QuestionPool, logger } = require("./dependencies");
+const { ResumeQuestionPool, logger } = require("./dependencies");
 
 /**
  * Get question by ID
@@ -18,7 +18,7 @@ const getQuestionById = async (req, res) => {
     const { interviewId, questionId } = req.params;
 
     // Get question pool
-    const questionPool = await QuestionPool.findOne({
+    const questionPool = await ResumeQuestionPool.findOne({
       interviewId: interviewId,
       userId: req.user.id,
     });

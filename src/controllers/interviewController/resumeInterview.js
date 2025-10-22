@@ -1,4 +1,4 @@
-const Interview = require("../../models/Interview");
+const ResumeInterview = require("../../models/Interview");
 
 const resumeInterview = async (req, res) => {
   try {
@@ -6,7 +6,7 @@ const resumeInterview = async (req, res) => {
     const userId = req.user.id;
 
     // Find interview and verify ownership
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
     });

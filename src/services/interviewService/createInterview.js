@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * Create new interview
@@ -25,7 +25,7 @@ const createInterview = async (userId, interviewData) => {
       scheduledTime,
     } = interviewData;
 
-    const interview = new Interview({
+    const interview = new ResumeInterview({
       candidateId: userId,
       resumeId,
       interviewType,

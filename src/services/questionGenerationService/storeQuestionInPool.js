@@ -1,4 +1,4 @@
-const { QuestionPool, logger } = require("./dependencies");
+const { ResumeQuestionPool, logger } = require("./dependencies");
 
 /**
  * Store question in question pool at specific index
@@ -18,12 +18,12 @@ const storeQuestionInPool = async (
   questionIndex = null
 ) => {
   try {
-    let questionPool = await QuestionPool.findOne({
+    let questionPool = await ResumeQuestionPool.findOne({
       interviewId: interviewId,
     });
 
     if (!questionPool) {
-      questionPool = new QuestionPool({
+      questionPool = new ResumeQuestionPool({
         resumeId: resumeId,
         interviewId: interviewId,
         userId: userId,

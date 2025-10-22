@@ -1,5 +1,5 @@
 const {
-  Interview,
+  ResumeInterview,
   User,
   AnalysisService,
   sendNotFoundError,
@@ -15,7 +15,7 @@ const testing = async (req, res) => {
   try {
     const { interviewId, userId } = req.body;
 
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,

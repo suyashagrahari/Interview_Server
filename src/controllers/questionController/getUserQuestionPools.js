@@ -1,4 +1,4 @@
-const { QuestionPool, logger } = require("./dependencies");
+const { ResumeQuestionPool, logger } = require("./dependencies");
 
 /**
  * Get user's question pools
@@ -18,12 +18,12 @@ const getUserQuestionPools = async (req, res) => {
     const { limit = 10, page = 1 } = req.query;
     const skip = (page - 1) * limit;
 
-    const questionPools = await QuestionPool.findByUser(
+    const questionPools = await ResumeQuestionPool.findByUser(
       req.user.id,
       parseInt(limit)
     );
 
-    const totalQuestionPools = await QuestionPool.countDocuments({
+    const totalQuestionPools = await ResumeQuestionPool.countDocuments({
       userId: req.user.id,
     });
 

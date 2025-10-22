@@ -1,4 +1,4 @@
-const Interview = require("../../models/Interview");
+const ResumeInterview = require("../../models/Interview");
 const logger = require("../../utils/logger");
 
 /**
@@ -16,7 +16,7 @@ const getExpectedAnswer = async (req, res) => {
     );
 
     // Find the interview by ID only (no candidateId check for hint access)
-    const interview = await Interview.findById(interviewId);
+    const interview = await ResumeInterview.findById(interviewId);
 
     if (!interview) {
       logger.error(`Interview not found: ${interviewId}`);

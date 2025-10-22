@@ -1,4 +1,4 @@
-const { Interview, logger } = require("./dependencies");
+const { ResumeInterview, logger } = require("./dependencies");
 
 /**
  * End interview and calculate final analysis
@@ -8,7 +8,7 @@ const { Interview, logger } = require("./dependencies");
  */
 const endInterview = async (interviewId, userId) => {
   try {
-    const interview = await Interview.findOne({
+    const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,
