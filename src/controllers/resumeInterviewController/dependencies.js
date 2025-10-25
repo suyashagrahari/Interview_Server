@@ -1,5 +1,5 @@
 // Shared dependencies for all interview controller functions
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 const Resume = require("../../models/Resume");
 const User = require("../../models/User");
 const logger = require("../../utils/logger");

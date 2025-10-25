@@ -1,11 +1,11 @@
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 const InterviewStateService = require("../../services/interviewStateService");
 const logger = require("../../utils/logger");
 
 /**
  * Check for active/incomplete interview for current user
  * Enhanced with user-level state tracking for cross-device support
- * @route GET /api/resume-based-interview/check-active
+ * @route GET /api/resume-interview/check-active
  */
 const checkActiveInterview = async (req, res) => {
   try {
@@ -49,7 +49,7 @@ const checkActiveInterview = async (req, res) => {
           currentQuestionNumber: answeredQuestions,
           totalQuestions,
           timeRemaining,
-          interviewType: "resume-based",
+          interviewType: "resume",
         });
 
         // Continue with response preparation
@@ -174,7 +174,7 @@ const checkActiveInterview = async (req, res) => {
     const responseData = {
       // Interview identification
       interviewId: activeInterview._id,
-      interviewType: "resume-based",
+      interviewType: "resume",
       interviewSourceType: activeInterview.interviewType || "technical", // technical/behavioral
 
       // Timing information

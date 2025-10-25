@@ -1,5 +1,5 @@
 const { ResumeQuestionPool, chatGPTService, logger } = require("./dependencies");
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 /**
  * Generate questions for an interview based on resume
  * @param {string} interviewId - Interview ID

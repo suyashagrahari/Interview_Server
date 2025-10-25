@@ -1,4 +1,4 @@
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 const ResumeQuestionPool = require("../../models/QuestionPool");
 const QuestionManagementService = require("../questionManagementService");
 const AnalysisService = require("../analysisService");

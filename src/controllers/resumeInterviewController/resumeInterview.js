@@ -1,4 +1,4 @@
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 
 const resumeInterview = async (req, res) => {
   try {

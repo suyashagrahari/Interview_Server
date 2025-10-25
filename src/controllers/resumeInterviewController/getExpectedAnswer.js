@@ -1,8 +1,8 @@
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 const logger = require("../../utils/logger");
 
 /**
- * @route   GET /api/interview/:id/questions/:questionId/hint
+ * @route   GET /api/resume-interview/:id/questions/:questionId/hint
  * @desc    Get expected answer (hint) for a specific question
  * @access  Private
  */

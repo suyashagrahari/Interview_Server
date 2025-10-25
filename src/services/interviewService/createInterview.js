@@ -70,7 +70,7 @@ const createInterview = async (userId, interviewData) => {
           currentQuestionNumber: 0,
           totalQuestions: 0,
           timeRemaining: interview.timeRemaining || 2700, // 45 minutes
-          interviewType: "resume-based",
+          interviewType: "resume",
         });
         logger.info(`User interview state updated for user ${userId}`);
       } catch (stateError) {

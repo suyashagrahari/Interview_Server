@@ -1,7 +1,7 @@
 // Shared dependencies for all question controller functions
 const ResumeQuestionPool = require("../../models/QuestionPool");
 const Resume = require("../../models/Resume");
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 const chatGPTService = require("../../services/chatgptService");
 const logger = require("../../utils/logger");
 

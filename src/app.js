@@ -21,8 +21,8 @@ const { errorHandler, notFound } = require("./middleware/errorHandler");
 // Import routes
 const authRoutes = require("./routes/auth");
 const resumeRoutes = require("./routes/resume");
-const interviewRoutes = require("./routes/interview");
-const resumeBasedInterviewRoutes = require("./routes/resumeBasedInterview");
+const jdRoutes = require("./routes/jd");
+const resumeInterviewRoutes = require("./routes/resumeInterview");
 const interviewerRoutes = require("./routes/interviewer");
 const ttsRoutes = require("./routes/tts");
 
@@ -76,8 +76,8 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
-app.use("/api/interview", interviewRoutes); // Legacy route - keep for backward compatibility
-app.use("/api/resume-based-interview", resumeBasedInterviewRoutes); // New resume-based interview routes
+app.use("/api/jd", jdRoutes);
+app.use("/api/resume-interview", resumeInterviewRoutes);
 app.use("/api/interviewers", interviewerRoutes);
 app.use("/api/tts", ttsRoutes);
 
@@ -87,7 +87,9 @@ app.use("/uploads", express.static("uploads"));
 // Serve test HTML file (development only)
 if (process.env.NODE_ENV === "development" || !process.env.NODE_ENV) {
   app.get("/test-audio", (req, res) => {
-    res.sendFile(require('path').join(__dirname, "../test-audio-playback.html"));
+    res.sendFile(
+      require("path").join(__dirname, "../test-audio-playback.html")
+    );
   });
 }
 

@@ -1,5 +1,5 @@
 const { ResumeQuestionPool, chatGPTService, logger } = require("./dependencies");
-const ResumeInterview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
 const User = require("../../models/User");
 const generateIntroductionQuestion = require("./generateIntroductionQuestion");
 

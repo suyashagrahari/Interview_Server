@@ -1,5 +1,5 @@
 const UserInterviewState = require("../models/UserInterviewState");
-const Interview = require("../models/Interview");
+const Interview = require("../models/ResumeInterview");
 const logger = require("../utils/logger");
 
 /**
@@ -24,7 +24,7 @@ class InterviewStateService {
         currentQuestionNumber,
         totalQuestions,
         timeRemaining,
-        interviewType = "resume-based",
+        interviewType = "resume",
       } = interviewData;
 
       // Calculate expected end time (assuming 45 minutes default)
@@ -207,7 +207,7 @@ class InterviewStateService {
         currentQuestionNumber,
         totalQuestions,
         timeRemaining: interview.timeRemaining,
-        interviewType: "resume-based", // Default for now
+        interviewType: "resume", // Default for now
       });
     } catch (error) {
       logger.error("Error syncing interview state:", error);

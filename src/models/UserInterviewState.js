@@ -29,12 +29,12 @@ const userInterviewStateSchema = new mongoose.Schema(
       interviewType: {
         type: String,
         enum: [
-          "resume-based",
-          "job-description-based",
-          "topic-based",
-          "company-based",
+          "resume",
+          "job-description",
+          "topic",
+          "company",
         ],
-        default: "resume-based",
+        default: "resume",
       },
 
       // Interview status
@@ -103,10 +103,10 @@ const userInterviewStateSchema = new mongoose.Schema(
         interviewType: {
           type: String,
           enum: [
-            "resume-based",
-            "job-description-based",
-            "topic-based",
-            "company-based",
+            "resume",
+            "job-description",
+            "topic",
+            "company",
           ],
         },
         status: {
@@ -186,7 +186,7 @@ userInterviewStateSchema.statics.updateActiveInterview = async function (
 
   const updateData = {
     "latestInterview.interviewId": interviewId,
-    "latestInterview.interviewType": interviewType || "resume-based",
+    "latestInterview.interviewType": interviewType || "resume",
     "latestInterview.status": status,
     "latestInterview.startedAt": startedAt,
     "latestInterview.completedAt": completedAt,
@@ -216,7 +216,7 @@ userInterviewStateSchema.statics.updateActiveInterview = async function (
       // Add new interview to recent list
       userState.recentInterviews.unshift({
         interviewId,
-        interviewType: interviewType || "resume-based",
+        interviewType: interviewType || "resume",
         status,
         startedAt,
         completedAt,
