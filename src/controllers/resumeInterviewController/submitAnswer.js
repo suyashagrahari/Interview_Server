@@ -215,7 +215,7 @@ const submitAnswer = async (req, res) => {
         );
 
         // Get question pool
-        const ResumeQuestionPool = require("../../models/QuestionPool");
+        const ResumeQuestionPool = require("../../models/ResumeInterviewQuestionPool");
         const questionPool = await ResumeQuestionPool.findOne({
           interviewId: interview._id,
           userId: interview.candidateId,

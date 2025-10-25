@@ -1,5 +1,5 @@
 const ResumeInterview = require("../../models/ResumeInterview");
-const ResumeQuestionPool = require("../../models/QuestionPool");
+const ResumeQuestionPool = require("../../models/ResumeInterviewQuestionPool");
 const QuestionManagementService = require("../questionManagementService");
 const AnalysisService = require("../analysisService");
 const sentimentAnalysisService = require("../sentimentAnalysisService");

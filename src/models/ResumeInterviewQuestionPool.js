@@ -209,4 +209,4 @@ resumeQuestionPoolSchema.pre("save", function (next) {
   next();
 });
 
-module.exports = mongoose.model("ResumeQuestionPool", resumeQuestionPoolSchema);
+module.exports = mongoose.model("ResumeInterviewQuestionPool", resumeQuestionPoolSchema);
