@@ -89,6 +89,18 @@ const checkActiveInterview = async (req, res) => {
       });
     }
 
+    // Check if interview is already completed or cancelled
+    if (activeInterview.status === "completed" || activeInterview.status === "cancelled") {
+      // Interview is no longer active, clean up state
+      await InterviewStateService.clearUserActiveInterview(userId);
+      logger.info(`Interview ${interviewId} is ${activeInterview.status}, clearing active state`);
+      return res.json({
+        success: true,
+        hasActiveInterview: false,
+        data: null,
+      });
+    }
+
     // Calculate time elapsed and remaining
     const startTime = new Date(activeInterview.startedAt);
     const now = new Date();

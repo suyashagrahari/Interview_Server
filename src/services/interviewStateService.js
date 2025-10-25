@@ -88,6 +88,13 @@ class InterviewStateService {
         return null;
       }
 
+      // Check if interview is completed - should not be returned as active
+      if (userState.latestInterview.isCompleted || userState.latestInterview.status === 'completed') {
+        await this.clearUserActiveInterview(userId);
+        logger.info(`Cleared completed interview state for user ${userId}`);
+        return null;
+      }
+
       return {
         interviewId: interview._id || userState.latestInterview.interviewId,
         interviewType: userState.latestInterview.interviewType,
