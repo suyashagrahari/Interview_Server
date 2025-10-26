@@ -23,6 +23,7 @@ const authRoutes = require("./routes/auth");
 const resumeRoutes = require("./routes/resume");
 const jdRoutes = require("./routes/jd");
 const resumeInterviewRoutes = require("./routes/resumeInterview");
+const jobDescriptionInterviewRoutes = require("./routes/jobDescriptionInterview");
 const interviewerRoutes = require("./routes/interviewer");
 const ttsRoutes = require("./routes/tts");
 
@@ -78,6 +79,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/jd", jdRoutes);
 app.use("/api/resume-interview", resumeInterviewRoutes);
+app.use("/api/job-description-interview", jobDescriptionInterviewRoutes);
 app.use("/api/interviewers", interviewerRoutes);
 app.use("/api/tts", ttsRoutes);
 

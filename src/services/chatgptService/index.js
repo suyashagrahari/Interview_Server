@@ -1,5 +1,6 @@
 // Main ChatGPT service - exports all modular functions
 const generateInterviewQuestions = require("./generateInterviewQuestions");
+const generateInterviewQuestionsFromJD = require("./generateInterviewQuestionsFromJD");
 const buildPrompt = require("./buildPrompt");
 const generateResponse = require("./generateResponse");
 const testConnection = require("./testConnection");
@@ -13,6 +14,7 @@ const {
 class ChatGPTService {
   constructor() {
     this.generateInterviewQuestions = generateInterviewQuestions;
+    this.generateInterviewQuestionsFromJD = generateInterviewQuestionsFromJD;
     this.buildPrompt = buildPrompt;
     this.generateResponse = generateResponse;
     this.testConnection = testConnection;
@@ -23,6 +25,10 @@ class ChatGPTService {
 
   async generateInterviewQuestions(params) {
     return await generateInterviewQuestions(params);
+  }
+
+  async generateInterviewQuestionsFromJD(params) {
+    return await generateInterviewQuestionsFromJD(params);
   }
 
   buildPrompt(params) {
@@ -53,6 +59,7 @@ class ChatGPTService {
 // Export both the class instance and individual functions
 module.exports = new ChatGPTService();
 module.exports.generateInterviewQuestions = generateInterviewQuestions;
+module.exports.generateInterviewQuestionsFromJD = generateInterviewQuestionsFromJD;
 module.exports.buildPrompt = buildPrompt;
 module.exports.generateResponse = generateResponse;
 module.exports.testConnection = testConnection;

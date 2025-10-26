@@ -19,7 +19,7 @@ const {
   checkActiveInterview,
   resumeInterview,
   getExpectedAnswer,
-} = require("../controllers/resumeInterviewController");
+} = require("../controllers/resumeControllers/resumeInterviewController");
 const {
   validateStartInterview,
   validateUpdateStatus,

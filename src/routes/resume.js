@@ -8,7 +8,7 @@ const {
   getUserResumes,
   getResumeById,
   deleteResume,
-} = require("../controllers/resumeController");
+} = require("../controllers/resumeControllers/resumeController");
 const { handleValidationErrors } = require("../middleware/validation");
 
 const router = express.Router();

@@ -1,4 +1,5 @@
 const ResumeInterview = require("../../models/ResumeInterview");
+const mongoose = require("mongoose");
 
 class InterviewTimerService {
   constructor(io) {
@@ -18,6 +19,13 @@ class InterviewTimerService {
     // Update time every second
     const intervalId = setInterval(async () => {
       try {
+        // Validate ObjectId before querying
+        if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+          console.error(`❌ Invalid interview ID format: ${interviewId}`);
+          this.stopTimer(interviewId);
+          return;
+        }
+
         const interview = await ResumeInterview.findById(interviewId);
 
         if (!interview || interview.status !== "in_progress") {
@@ -88,6 +96,12 @@ class InterviewTimerService {
    */
   async getTimeRemaining(interviewId) {
     try {
+      // Validate ObjectId before querying
+      if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+        console.error(`❌ Invalid interview ID format: ${interviewId}`);
+        return { success: false, timeRemaining: 0 };
+      }
+
       const interview = await ResumeInterview.findById(interviewId);
 
       if (!interview || !interview.startedAt) {

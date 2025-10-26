@@ -8,7 +8,7 @@ const {
   getUserJds,
   getJdById,
   deleteJd,
-} = require("../controllers/jdController");
+} = require("../controllers/jobDescriptionControllers/jdController");
 const { handleValidationErrors } = require("../middleware/validation");
 
 const router = express.Router();

@@ -1,10 +1,18 @@
 const ResumeInterview = require("../../models/ResumeInterview");
 const ResumeQuestionPool = require("../../models/ResumeInterviewQuestionPool");
-const QuestionManagementService = require("../questionManagementService");
-const AnalysisService = require("../analysisService");
+
+// Use resume-specific services for resume interviews
+const ResumeQuestionManagementService = require("../resumeServices/resumeQuestionManagementService");
+const UnifiedQuestionManagementService = require("../unifiedQuestionManagementService");
+const JobDescriptionInterviewHandler = require("../jobDescriptionServices/jobDescriptionWebSocketHandlers/jobDescriptionInterviewWebSocketHandler");
+const JobDescriptionQuestionManagementService = require("../jobDescriptionServices/jobDescriptionQuestionManagementService");
+const ResumeAnalysisService = require("../resumeServices/resumeAnalysisService");
+
+// Shared services
 const sentimentAnalysisService = require("../sentimentAnalysisService");
 const ttsService = require("../ttsService");
 const logger = require("../../utils/logger");
+const mongoose = require("mongoose");
 
 /**
  * WebSocket Interview Handler Service
@@ -45,36 +53,190 @@ class InterviewHandlerService {
    */
   async handleGenerateFirstQuestion(socket, { interviewId, userId }) {
     try {
-      logger.info(`🎯 Generating first question for interview ${interviewId}, userId: ${userId}`);
+      logger.info(
+        `🎯 Generating first question for interview ${interviewId}, userId: ${userId}`
+      );
+
+      // Detect interview type first (needed for error logging and debugging)
+      const interviewType =
+        await UnifiedQuestionManagementService.detectInterviewType(interviewId);
+
+      // Check if interview type was detected
+      if (!interviewType) {
+        socket.emit("question:error", {
+          success: false,
+          message: "Interview not found",
+          code: "INTERVIEW_NOT_FOUND",
+        });
+        return;
+      }
+
+      // Route to appropriate handler based on interview type
+      if (interviewType === "job-description") {
+        return await JobDescriptionInterviewHandler.handleGenerateFirstQuestion(
+          socket,
+          { interviewId, userId }
+        );
+      }
 
       // If userId is a fallback (starts with 'interview-'), fetch actual candidateId
       let effectiveUserId = userId;
-      if (userId && userId.startsWith('interview-')) {
-        logger.info('⚠️ Fallback userId detected, fetching actual candidateId from interview');
-        const interview = await ResumeInterview.findById(interviewId);
-        if (interview) {
-          effectiveUserId = interview.candidateId.toString();
-          logger.info(`✅ Using actual candidateId: ${effectiveUserId}`);
+      if (userId && userId.startsWith("interview-")) {
+        logger.info(
+          "⚠️ Fallback userId detected, fetching actual candidateId from interview"
+        );
+
+        // Get the appropriate interview model
+        const { InterviewModel } =
+          interviewType === "job-description"
+            ? {
+                InterviewModel: require("../../models/JobDescriptionInterview"),
+              }
+            : { InterviewModel: ResumeInterview };
+
+        // Validate ObjectId before querying
+        if (mongoose.Types.ObjectId.isValid(interviewId)) {
+          const interview = await InterviewModel.findById(interviewId);
+          if (interview) {
+            effectiveUserId = interview.candidateId.toString();
+            logger.info(
+              `✅ Using actual candidateId: ${effectiveUserId} for ${interviewType} interview`
+            );
+          }
+        } else {
+          logger.error(`❌ Invalid interview ID format: ${interviewId}`);
         }
       }
 
-      // Get first question from service
-      const result = await QuestionManagementService.getFirstQuestion(
-        interviewId,
-        effectiveUserId
-      );
+      // Get first question from unified service
+      let result;
+      try {
+        result = await UnifiedQuestionManagementService.getFirstQuestion(
+          interviewId,
+          effectiveUserId
+        );
+      } catch (error) {
+        logger.error("❌ Error calling getFirstQuestion:", error);
+        socket.emit("question:error", {
+          success: false,
+          message: "Internal server error while generating first question",
+          code: "INTERNAL_ERROR",
+          details: {
+            error: error.message,
+            stack: error.stack,
+          },
+        });
+        return;
+      }
 
       if (!result.success) {
+        logger.error("❌ getFirstQuestion failed:", result);
         socket.emit("question:error", {
           success: false,
           message: result.message,
           code: "QUESTION_GENERATION_FAILED",
+          details: result.error ? { error: result.error } : undefined,
         });
         return;
       }
 
       // SECURITY: Remove expectedAnswer from response
-      const { expectedAnswer, ...questionWithoutAnswer } = result.data.question;
+      // Convert Mongoose subdocument to plain object first
+      const questionObj = result.data.question.toObject
+        ? result.data.question.toObject()
+        : result.data.question;
+      const { expectedAnswer, ...questionWithoutAnswer } = questionObj;
+
+      // Debug logging for question data
+      console.log(
+        "🔍 DEBUG: Converted question object:",
+        JSON.stringify(questionObj, null, 2)
+      );
+      console.log(
+        "🔍 DEBUG: After destructuring - questionWithoutAnswer:",
+        JSON.stringify(questionWithoutAnswer, null, 2)
+      );
+      console.log("🔍 DEBUG: Question ID:", questionWithoutAnswer.questionId);
+      console.log("🔍 DEBUG: Question text:", questionWithoutAnswer.question);
+      console.log(
+        "🔍 DEBUG: Question category:",
+        questionWithoutAnswer.category
+      );
+      console.log(
+        "🔍 DEBUG: Question difficulty:",
+        questionWithoutAnswer.difficulty
+      );
+      console.log(
+        "🔍 DEBUG: Question type:",
+        typeof questionWithoutAnswer.question
+      );
+      console.log(
+        "🔍 DEBUG: Question length:",
+        questionWithoutAnswer.question
+          ? questionWithoutAnswer.question.length
+          : 0
+      );
+      console.log(
+        "🔍 DEBUG: Has question property:",
+        "question" in questionWithoutAnswer
+      );
+      console.log(
+        "🔍 DEBUG: Question property value:",
+        questionWithoutAnswer.question
+      );
+
+      // Validate question text before TTS generation
+      console.log("🔍 DEBUG: Validation checks:");
+      console.log(
+        "🔍 DEBUG: - questionWithoutAnswer.question exists:",
+        !!questionWithoutAnswer.question
+      );
+      console.log(
+        "🔍 DEBUG: - questionWithoutAnswer.question is string:",
+        typeof questionWithoutAnswer.question === "string"
+      );
+      console.log(
+        "🔍 DEBUG: - questionWithoutAnswer.question is not empty:",
+        questionWithoutAnswer.question
+          ? questionWithoutAnswer.question.trim() !== ""
+          : false
+      );
+      console.log(
+        "🔍 DEBUG: - questionWithoutAnswer.question value:",
+        questionWithoutAnswer.question
+      );
+      console.log(
+        "🔍 DEBUG: - questionWithoutAnswer.question length:",
+        questionWithoutAnswer.question
+          ? questionWithoutAnswer.question.length
+          : 0
+      );
+
+      if (
+        !questionWithoutAnswer.question ||
+        typeof questionWithoutAnswer.question !== "string" ||
+        questionWithoutAnswer.question.trim() === ""
+      ) {
+        logger.error("❌ Invalid question text for TTS generation:", {
+          questionWithoutAnswer,
+          originalQuestion: result.data.question,
+          interviewId,
+          interviewType,
+        });
+        socket.emit("question:error", {
+          success: false,
+          message: "Invalid question text received",
+          code: "INVALID_QUESTION_TEXT",
+          details: {
+            questionId: questionWithoutAnswer.questionId,
+            questionType: typeof questionWithoutAnswer.question,
+            questionLength: questionWithoutAnswer.question
+              ? questionWithoutAnswer.question.length
+              : 0,
+          },
+        });
+        return;
+      }
 
       // Generate TTS audio for the question
       let audioData = null;
@@ -93,7 +255,11 @@ class InterviewHandlerService {
             fileName: audioResult.fileName,
             mimeType: "audio/mpeg",
           };
-          logger.info(`✅ TTS audio generated: ${audioResult.fileName}, base64 length: ${audioResult.audioBase64?.length || 0}`);
+          logger.info(
+            `✅ TTS audio generated: ${audioResult.fileName}, base64 length: ${
+              audioResult.audioBase64?.length || 0
+            }`
+          );
         } else {
           logger.warn(`⚠️ TTS generation failed: ${audioResult.message}`);
         }
@@ -114,7 +280,9 @@ class InterviewHandlerService {
       });
 
       logger.info(
-        `✅ First question emitted to user ${userId} (question ID: ${result.data.question.questionId}) with ${audioData ? 'audio' : 'no audio'}`
+        `✅ First question emitted to user ${userId} (question ID: ${
+          result.data.question.questionId
+        }) with ${audioData ? "audio" : "no audio"}`
       );
     } catch (error) {
       logger.error("Error generating first question:", error);
@@ -129,26 +297,65 @@ class InterviewHandlerService {
   /**
    * Handle answer submission via WebSocket
    */
-  async handleSubmitAnswer(socket, {
-    interviewId,
-    questionId,
-    userId,
-    answer,
-    proctoringData,
-  }) {
+  async handleSubmitAnswer(
+    socket,
+    { interviewId, questionId, userId, answer, proctoringData }
+  ) {
     try {
       logger.info(
         `📤 Processing answer submission for interview ${interviewId}, question ${questionId}, userId: ${userId}`
       );
 
+      // Detect interview type first
+      const interviewType =
+        await UnifiedQuestionManagementService.detectInterviewType(interviewId);
+      if (!interviewType) {
+        socket.emit("answer:error", {
+          success: false,
+          message: "Interview not found",
+          code: "INTERVIEW_NOT_FOUND",
+        });
+        return;
+      }
+
+      // Route to appropriate handler based on interview type
+      if (interviewType === "job-description") {
+        return await JobDescriptionInterviewHandler.handleSubmitAnswer(socket, {
+          interviewId,
+          questionId,
+          userId,
+          answer,
+          proctoringData,
+        });
+      }
+
+      // Default to resume interview logic for other types
       // If userId is a fallback (starts with 'interview-'), fetch actual candidateId
       let effectiveUserId = userId;
-      if (userId && userId.startsWith('interview-')) {
-        logger.info('⚠️ Fallback userId detected, fetching actual candidateId from interview');
-        const tempInterview = await ResumeInterview.findById(interviewId);
-        if (tempInterview) {
-          effectiveUserId = tempInterview.candidateId.toString();
-          logger.info(`✅ Using actual candidateId: ${effectiveUserId}`);
+      if (userId && userId.startsWith("interview-")) {
+        logger.info(
+          "⚠️ Fallback userId detected, fetching actual candidateId from interview"
+        );
+
+        // Get the appropriate interview model
+        const { InterviewModel } =
+          interviewType === "job-description"
+            ? {
+                InterviewModel: require("../../models/JobDescriptionInterview"),
+              }
+            : { InterviewModel: ResumeInterview };
+
+        // Validate ObjectId before querying
+        if (mongoose.Types.ObjectId.isValid(interviewId)) {
+          const tempInterview = await InterviewModel.findById(interviewId);
+          if (tempInterview) {
+            effectiveUserId = tempInterview.candidateId.toString();
+            logger.info(
+              `✅ Using actual candidateId: ${effectiveUserId} for ${interviewType} interview`
+            );
+          }
+        } else {
+          logger.error(`❌ Invalid interview ID format: ${interviewId}`);
         }
       }
 
@@ -172,12 +379,24 @@ class InterviewHandlerService {
         message: "Analyzing your answer...",
       });
 
+      // Interview type already detected above
+
+      const { InterviewModel } =
+        interviewType === "job-description"
+          ? { InterviewModel: require("../../models/JobDescriptionInterview") }
+          : { InterviewModel: ResumeInterview };
+
       // Find the interview
-      const interview = await ResumeInterview.findOne({
+      const interview = await InterviewModel.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,
-      }).populate("resumeId", "resumeText resumeName");
+      }).populate(
+        interviewType === "job-description" ? "jobDescriptionId" : "resumeId",
+        interviewType === "job-description"
+          ? "jdText jdName"
+          : "resumeText resumeName"
+      );
 
       if (!interview) {
         socket.emit("answer:error", {
@@ -192,7 +411,8 @@ class InterviewHandlerService {
       if (interview.isTerminated) {
         socket.emit("interview:terminated", {
           success: true,
-          message: "Interview was terminated due to professional conduct violations",
+          message:
+            "Interview was terminated due to professional conduct violations",
           data: {
             questionId,
             questionNumber,
@@ -238,13 +458,23 @@ class InterviewHandlerService {
         `[SubmitAnswer] Sentiment analysis result: ${currentSentiment}`
       );
 
-      // Update answer with sentiment
-      await interview.updateAnswer(
+      // Update answer using unified service
+      const updateResult = await UnifiedQuestionManagementService.submitAnswer(
+        interviewId,
         questionId,
+        effectiveUserId,
         answer,
-        timeSpent,
-        currentSentiment
+        proctoringData
       );
+
+      if (!updateResult.success) {
+        socket.emit("answer:error", {
+          success: false,
+          message: updateResult.message,
+          code: "ANSWER_UPDATE_FAILED",
+        });
+        return;
+      }
 
       // Update the question's sentiment in the interview
       const questionToUpdate = interview.questions.find(
@@ -293,14 +523,14 @@ class InterviewHandlerService {
       await interview.save();
 
       // Mark question as completed in question pool
-      await QuestionManagementService.markQuestionCompleted(
+      await ResumeQuestionManagementService.markQuestionCompleted(
         interviewId,
         effectiveUserId,
         questionId
       );
 
       // Process answer analysis in background (don't wait)
-      const analysisPromise = AnalysisService.analyzeAnswer(
+      const analysisPromise = ResumeAnalysisService.analyzeAnswer(
         interview,
         question,
         answer,
@@ -436,7 +666,7 @@ class InterviewHandlerService {
         // Current question is from pool, generate follow-up question
         logger.info("🔄 Generating follow-up question...");
 
-        nextQuestion = await AnalysisService.generateFollowUpQuestion(
+        nextQuestion = await ResumeAnalysisService.generateFollowUpQuestion(
           interview,
           currentQuestion,
           answer,
@@ -475,14 +705,14 @@ class InterviewHandlerService {
           if (currentSentiment === "NEGATIVE") {
             // Add warning to the question
             personalizedQuestion =
-              await AnalysisService.rephraseQuestionWithWarning(
+              await ResumeAnalysisService.rephraseQuestionWithWarning(
                 poolQuestion.question,
                 currentSentiment
               );
           } else {
             // Personalize based on previous answer
             personalizedQuestion =
-              await AnalysisService.rephraseQuestionWithPersonalization(
+              await ResumeAnalysisService.rephraseQuestionWithPersonalization(
                 poolQuestion.question,
                 answer,
                 currentSentiment
@@ -532,12 +762,21 @@ class InterviewHandlerService {
               fileName: audioResult.fileName,
               mimeType: "audio/mpeg",
             };
-            logger.info(`✅ TTS audio generated for next question: ${audioResult.fileName}, base64 length: ${audioResult.audioBase64?.length || 0}`);
+            logger.info(
+              `✅ TTS audio generated for next question: ${
+                audioResult.fileName
+              }, base64 length: ${audioResult.audioBase64?.length || 0}`
+            );
           } else {
-            logger.warn(`⚠️ TTS generation failed for next question: ${audioResult.message}`);
+            logger.warn(
+              `⚠️ TTS generation failed for next question: ${audioResult.message}`
+            );
           }
         } catch (audioError) {
-          logger.error("Error generating TTS audio for next question:", audioError);
+          logger.error(
+            "Error generating TTS audio for next question:",
+            audioError
+          );
         }
 
         // Emit next question to client (without expectedAnswer) with audio
@@ -554,7 +793,9 @@ class InterviewHandlerService {
         });
 
         logger.info(
-          `✅ Next question emitted (question ID: ${nextQuestion.questionId}) with ${audioData ? 'audio' : 'no audio'}`
+          `✅ Next question emitted (question ID: ${
+            nextQuestion.questionId
+          }) with ${audioData ? "audio" : "no audio"}`
         );
       } else {
         // No more questions, interview complete
@@ -584,18 +825,64 @@ class InterviewHandlerService {
     try {
       logger.info(`🔄 Handling reconnection for user ${userId}`);
 
+      // Detect interview type first
+      const interviewType =
+        await UnifiedQuestionManagementService.detectInterviewType(interviewId);
+      if (!interviewType) {
+        socket.emit("reconnection:error", {
+          success: false,
+          message: "Interview not found",
+          code: "INTERVIEW_NOT_FOUND",
+        });
+        return;
+      }
+
+      // Route to appropriate handler based on interview type
+      if (interviewType === "job-description") {
+        return await JobDescriptionInterviewHandler.handleReconnection(socket, {
+          interviewId,
+          userId,
+        });
+      }
+
+      // Default to resume interview logic for other types
       // If userId is a fallback (starts with 'interview-'), fetch actual candidateId
       let effectiveUserId = userId;
-      if (userId && userId.startsWith('interview-')) {
-        logger.info('⚠️ Fallback userId detected, fetching actual candidateId from interview');
-        const tempInterview = await ResumeInterview.findById(interviewId);
-        if (tempInterview) {
-          effectiveUserId = tempInterview.candidateId.toString();
-          logger.info(`✅ Using actual candidateId: ${effectiveUserId}`);
+      if (userId && userId.startsWith("interview-")) {
+        logger.info(
+          "⚠️ Fallback userId detected, fetching actual candidateId from interview"
+        );
+
+        // Get the appropriate interview model
+        const { InterviewModel } =
+          interviewType === "job-description"
+            ? {
+                InterviewModel: require("../../models/JobDescriptionInterview"),
+              }
+            : { InterviewModel: ResumeInterview };
+
+        // Validate ObjectId before querying
+        if (mongoose.Types.ObjectId.isValid(interviewId)) {
+          const tempInterview = await InterviewModel.findById(interviewId);
+          if (tempInterview) {
+            effectiveUserId = tempInterview.candidateId.toString();
+            logger.info(
+              `✅ Using actual candidateId: ${effectiveUserId} for ${interviewType} interview`
+            );
+          }
+        } else {
+          logger.error(`❌ Invalid interview ID format: ${interviewId}`);
         }
       }
 
-      const interview = await ResumeInterview.findOne({
+      // Interview type already detected above
+
+      const { InterviewModel } =
+        interviewType === "job-description"
+          ? { InterviewModel: require("../../models/JobDescriptionInterview") }
+          : { InterviewModel: ResumeInterview };
+
+      const interview = await InterviewModel.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,
@@ -675,20 +962,51 @@ class InterviewHandlerService {
   /**
    * Handle proctoring data updates (tab switches, copy/paste, etc.)
    */
-  async handleProctoringUpdate(socket, { interviewId, userId, proctoringData }) {
+  async handleProctoringUpdate(
+    socket,
+    { interviewId, userId, proctoringData }
+  ) {
     try {
       logger.info(`🔍 Updating proctoring data for interview ${interviewId}`);
 
       // If userId is a fallback, fetch actual candidateId
       let effectiveUserId = userId;
-      if (userId && userId.startsWith('interview-')) {
-        const tempInterview = await ResumeInterview.findById(interviewId);
+      if (userId && userId.startsWith("interview-")) {
+        // Detect interview type first
+        const interviewType =
+          await UnifiedQuestionManagementService.detectInterviewType(
+            interviewId
+          );
+        if (!interviewType) {
+          socket.emit("proctoring:error", {
+            success: false,
+            message: "Interview not found",
+          });
+          return;
+        }
+
+        // Get the appropriate interview model
+        const { InterviewModel } =
+          interviewType === "job-description"
+            ? {
+                InterviewModel: require("../../models/JobDescriptionInterview"),
+              }
+            : { InterviewModel: ResumeInterview };
+
+        const tempInterview = await InterviewModel.findById(interviewId);
         if (tempInterview) {
           effectiveUserId = tempInterview.candidateId.toString();
         }
       }
 
-      const interview = await ResumeInterview.findOne({
+      // Interview type already detected above
+
+      const { InterviewModel } =
+        interviewType === "job-description"
+          ? { InterviewModel: require("../../models/JobDescriptionInterview") }
+          : { InterviewModel: ResumeInterview };
+
+      const interview = await InterviewModel.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,
@@ -705,7 +1023,10 @@ class InterviewHandlerService {
       // Update proctoring data in database
       await interview.updateProctoringData(proctoringData);
 
-      logger.info(`✅ Proctoring data updated for interview ${interviewId}:`, proctoringData);
+      logger.info(
+        `✅ Proctoring data updated for interview ${interviewId}:`,
+        proctoringData
+      );
 
       // Acknowledge update
       socket.emit("proctoring:updated", {
@@ -733,14 +1054,42 @@ class InterviewHandlerService {
 
       // If userId is a fallback, fetch actual candidateId
       let effectiveUserId = userId;
-      if (userId && userId.startsWith('interview-')) {
-        const tempInterview = await ResumeInterview.findById(interviewId);
+      if (userId && userId.startsWith("interview-")) {
+        // Detect interview type first
+        const interviewType =
+          await UnifiedQuestionManagementService.detectInterviewType(
+            interviewId
+          );
+        if (!interviewType) {
+          socket.emit("proctoring:error", {
+            success: false,
+            message: "Interview not found",
+          });
+          return;
+        }
+
+        // Get the appropriate interview model
+        const { InterviewModel } =
+          interviewType === "job-description"
+            ? {
+                InterviewModel: require("../../models/JobDescriptionInterview"),
+              }
+            : { InterviewModel: ResumeInterview };
+
+        const tempInterview = await InterviewModel.findById(interviewId);
         if (tempInterview) {
           effectiveUserId = tempInterview.candidateId.toString();
         }
       }
 
-      const interview = await ResumeInterview.findOne({
+      // Interview type already detected above
+
+      const { InterviewModel } =
+        interviewType === "job-description"
+          ? { InterviewModel: require("../../models/JobDescriptionInterview") }
+          : { InterviewModel: ResumeInterview };
+
+      const interview = await InterviewModel.findOne({
         _id: interviewId,
         candidateId: effectiveUserId,
         isActive: true,

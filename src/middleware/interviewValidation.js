@@ -85,6 +85,118 @@ const validateStartInterview = [
 ];
 
 /**
+ * Validation rules for starting job description interview
+ */
+const validateStartJobDescriptionInterview = [
+  body("jobDescriptionId")
+    .notEmpty()
+    .withMessage("Job Description ID is required")
+    .isMongoId()
+    .withMessage("Invalid job description ID format"),
+
+  body("interviewType")
+    .notEmpty()
+    .withMessage("Interview type is required")
+    .isIn(["technical", "behavioral"])
+    .withMessage("Interview type must be either 'technical' or 'behavioral'"),
+
+  body("experienceLevel")
+    .notEmpty()
+    .withMessage("Experience level is required")
+    .isIn(["0-2", "3-4", "5-6", "7-8", "9-10"])
+    .withMessage("Invalid experience level"),
+
+  body("difficultyLevel")
+    .notEmpty()
+    .withMessage("Difficulty level is required")
+    .isIn(["beginner", "intermediate", "expert"])
+    .withMessage(
+      "Difficulty level must be 'beginner', 'intermediate', or 'expert'"
+    ),
+
+  body("interviewerId")
+    .notEmpty()
+    .withMessage("Interviewer ID is required")
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage("Interviewer ID must be between 1 and 50 characters"),
+
+  body("interviewer")
+    .notEmpty()
+    .withMessage("Interviewer details are required"),
+
+  body("interviewer.name")
+    .notEmpty()
+    .withMessage("Interviewer name is required")
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Interviewer name must be between 1 and 100 characters"),
+
+  body("interviewer.experience")
+    .notEmpty()
+    .withMessage("Interviewer experience is required")
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Experience must be between 1 and 100 characters"),
+
+  body("interviewer.bio")
+    .notEmpty()
+    .withMessage("Interviewer bio is required")
+    .trim()
+    .isLength({ min: 10, max: 500 })
+    .withMessage("Bio must be between 10 and 500 characters"),
+
+  body("interviewer.numberOfInterviewers")
+    .optional()
+    .isInt({ min: 1, max: 10 })
+    .withMessage("Number of interviewers must be between 1 and 10"),
+
+  body("interviewer.introduction")
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Introduction cannot be more than 1000 characters"),
+
+  body("jobRole")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Job role must be between 1 and 100 characters"),
+
+  body("companyName")
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage("Company name cannot be more than 100 characters"),
+
+  body("skills").optional().isArray().withMessage("Skills must be an array"),
+
+  body("additionalNotes")
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Additional notes cannot be more than 1000 characters"),
+
+  body("scheduled")
+    .optional()
+    .isBoolean()
+    .withMessage("Scheduled must be a boolean"),
+
+  body("scheduledDate")
+    .optional()
+    .isISO8601()
+    .withMessage("Scheduled date must be a valid ISO 8601 date"),
+
+  body("scheduledTime")
+    .optional()
+    .trim()
+    .isLength({ max: 10 })
+    .withMessage("Scheduled time cannot be more than 10 characters"),
+
+  handleValidationErrors,
+];
+
+/**
  * Validation rules for updating interview status
  */
 const validateUpdateStatus = [
@@ -288,6 +400,7 @@ const validateSubmitAnswer = [
 
 module.exports = {
   validateStartInterview,
+  validateStartJobDescriptionInterview,
   validateUpdateStatus,
   validateAddQuestion,
   validateUpdateAnswer,
