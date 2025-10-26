@@ -5,6 +5,7 @@ const {
   getUserInterviews,
   getInterviewById,
   checkActiveInterview,
+  endInterview,
 } = require("../controllers/jobDescriptionControllers/jobDescriptionInterviewController");
 const {
   validateStartJobDescriptionInterview,
@@ -52,5 +53,12 @@ router.get("/check-active", authenticateToken, checkActiveInterview);
  * @access  Private
  */
 router.get("/:id", authenticateToken, getInterviewById);
+
+/**
+ * @route   POST /api/job-description-interview/:id/end
+ * @desc    End job description interview and mark as completed
+ * @access  Private
+ */
+router.post("/:id/end", authenticateToken, endInterview);
 
 module.exports = router;

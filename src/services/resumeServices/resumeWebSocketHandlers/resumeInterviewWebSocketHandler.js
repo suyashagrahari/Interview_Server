@@ -211,7 +211,10 @@ class ResumeInterviewWebSocketHandler {
         }) with ${audioData ? "audio" : "no audio"}`
       );
     } catch (error) {
-      logger.error("[Resume Interview] Error generating first question:", error);
+      logger.error(
+        "[Resume Interview] Error generating first question:",
+        error
+      );
       socket.emit("question:error", {
         success: false,
         message: "Internal server error while generating first question",
@@ -482,15 +485,62 @@ class ResumeInterviewWebSocketHandler {
         logger.error("[Resume Interview] Error processing analysis:", error);
       }
 
-      // If interview terminated, don't generate next question
+      // If interview terminated, end the interview properly
       if (interviewTerminated) {
+        logger.info(
+          `[Resume Interview] Ending terminated interview ${interviewId}`
+        );
+
+        // Mark interview as completed
+        interview.status = "completed";
+        interview.completedAt = new Date();
+        if (interview.startedAt) {
+          interview.totalDuration = Math.round(
+            (interview.completedAt - interview.startedAt) / 1000 / 60
+          );
+        }
+
+        // Calculate overall analysis
+        await interview.calculateOverallAnalysis();
+
+        // Save the interview
+        await interview.save();
+
+        logger.info(
+          `[Resume Interview] Interview ${interviewId} completed due to termination`
+        );
+
+        // Clear user's active interview state
+        try {
+          const InterviewStateService = require("../../interviewStateService");
+          await InterviewStateService.markInterviewCompleted(
+            effectiveUserId,
+            interviewId
+          );
+          logger.info(
+            `[Resume Interview] User interview state cleared for user ${effectiveUserId}, interview ${interviewId}`
+          );
+        } catch (stateError) {
+          logger.error(
+            "[Resume Interview] Error clearing user interview state:",
+            stateError
+          );
+        }
+
         socket.emit("interview:complete", {
           success: true,
-          message: "Interview terminated",
+          message:
+            "Interview terminated due to professional conduct violations",
           data: {
+            interviewId: interview._id,
+            status: interview.status,
             totalQuestionsAsked: interview.questions.length,
             isInterviewComplete: true,
             reason: "terminated",
+            terminationReason: interview.terminationReason,
+            completedAt: interview.completedAt,
+            totalDuration: interview.totalDuration,
+            overallAnalysis: interview.overallAnalysis,
           },
         });
         return;
@@ -561,20 +611,26 @@ class ResumeInterviewWebSocketHandler {
         );
 
         if (nextQuestion) {
-          await interview.addQuestion({
-            questionId: nextQuestion.questionId,
-            question: nextQuestion.question,
-            category: nextQuestion.category,
-            difficulty: nextQuestion.difficulty || "medium",
-            expectedAnswer: nextQuestion.expectedAnswer,
-            questionType: "followup",
-          });
+          try {
+            await interview.addQuestion({
+              questionId: nextQuestion.questionId,
+              question: nextQuestion.question,
+              category: nextQuestion.category,
+              difficulty: nextQuestion.difficulty || "medium",
+              expectedAnswer: nextQuestion.expectedAnswer,
+              questionType: "followup",
+            });
+          } catch (addQuestionError) {
+            logger.error(
+              "[Resume Interview] Error adding follow-up question to interview:",
+              addQuestionError
+            );
+            throw addQuestionError;
+          }
         }
       } else if (currentQuestion.questionType === "followup") {
         // Current question is follow-up, get next question from pool
-        logger.info(
-          "🔄 [Resume Interview] Getting next question from pool..."
-        );
+        logger.info("🔄 [Resume Interview] Getting next question from pool...");
 
         const poolQuestionIndex = Math.floor(
           (interview.questions.length + 1) / 2
@@ -615,21 +671,46 @@ class ResumeInterviewWebSocketHandler {
             expectedAnswer: poolQuestion.expectedAnswer,
           };
 
-          await interview.addQuestion({
-            questionId: nextQuestion.questionId,
-            question: nextQuestion.question,
-            category: nextQuestion.category,
-            difficulty: nextQuestion.difficulty,
-            expectedAnswer: nextQuestion.expectedAnswer,
-            questionType: "pool",
-          });
+          try {
+            await interview.addQuestion({
+              questionId: nextQuestion.questionId,
+              question: nextQuestion.question,
+              category: nextQuestion.category,
+              difficulty: nextQuestion.difficulty,
+              expectedAnswer: nextQuestion.expectedAnswer,
+              questionType: "pool",
+            });
 
-          // Mark question as asked in question pool
-          await questionPool.markQuestionAsked(poolQuestion.questionId);
+            // Mark question as asked in question pool
+            await questionPool.markQuestionAsked(poolQuestion.questionId);
+          } catch (addQuestionError) {
+            logger.error(
+              "[Resume Interview] Error adding pool question to interview:",
+              addQuestionError
+            );
+            throw addQuestionError;
+          }
         }
       }
 
       if (nextQuestion) {
+        // Validate nextQuestion before processing
+        if (
+          !nextQuestion.question ||
+          typeof nextQuestion.question !== "string"
+        ) {
+          logger.error(
+            "[Resume Interview] Invalid nextQuestion data:",
+            nextQuestion
+          );
+          socket.emit("question:error", {
+            success: false,
+            message: "Invalid question data received",
+            code: "INVALID_QUESTION_DATA",
+          });
+          return;
+        }
+
         // SECURITY: Remove expectedAnswer from response
         const { expectedAnswer, ...questionWithoutAnswer } = nextQuestion;
 
@@ -643,7 +724,7 @@ class ResumeInterviewWebSocketHandler {
             nextQuestion.questionId // Pass questionId
           );
 
-          if (audioResult.success) {
+          if (audioResult && audioResult.success) {
             audioData = {
               audioBase64: audioResult.audioBase64,
               url: audioResult.url,
@@ -657,7 +738,9 @@ class ResumeInterviewWebSocketHandler {
             );
           } else {
             logger.warn(
-              `⚠️ [Resume Interview] TTS generation failed for next question: ${audioResult.message}`
+              `⚠️ [Resume Interview] TTS generation failed for next question: ${
+                audioResult?.message || "Unknown error"
+              }`
             );
           }
         } catch (audioError) {
@@ -665,6 +748,7 @@ class ResumeInterviewWebSocketHandler {
             "[Resume Interview] Error generating TTS audio for next question:",
             audioError
           );
+          // Don't throw - continue without audio
         }
 
         // Emit next question to client (without expectedAnswer) with audio

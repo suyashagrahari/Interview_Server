@@ -342,6 +342,66 @@ class JobDescriptionQuestionManagementService {
   }
 
   /**
+   * Mark question as completed in the question pool
+   */
+  async markQuestionCompleted(interviewId, userId, questionId) {
+    try {
+      logger.info(
+        `🔍 [JD] Marking question ${questionId} as completed for interview ${interviewId}`
+      );
+
+      const questionPool = await JobDescriptionInterviewQuestionPool.findOne({
+        interviewId: interviewId,
+        userId: userId,
+      });
+
+      if (!questionPool) {
+        logger.warn(
+          `⚠️ [JD] Question pool not found for interview ${interviewId}`
+        );
+        return {
+          success: false,
+          message: "Question pool not found",
+        };
+      }
+
+      // Find and mark the question as asked
+      const question = questionPool.questions.find(
+        (q) => q.questionId === questionId
+      );
+
+      if (question) {
+        question.isAsked = true;
+        question.askedAt = new Date();
+        await questionPool.save();
+
+        logger.info(
+          `✅ [JD] Question ${questionId} marked as completed in pool`
+        );
+        return {
+          success: true,
+          message: "Question marked as completed",
+        };
+      } else {
+        logger.warn(
+          `⚠️ [JD] Question ${questionId} not found in pool for interview ${interviewId}`
+        );
+        return {
+          success: false,
+          message: "Question not found in pool",
+        };
+      }
+    } catch (error) {
+      logger.error("[JD] Error marking question as completed:", error);
+      return {
+        success: false,
+        message: "Error marking question as completed",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Detect interview type (always returns 'job-description' for this service)
    */
   async detectInterviewType(interviewId) {

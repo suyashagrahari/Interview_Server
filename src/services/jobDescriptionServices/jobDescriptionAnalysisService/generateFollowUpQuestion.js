@@ -27,17 +27,27 @@ const generateFollowUpQuestion = async (
   const random = Math.floor(Math.random() * 1000);
   const uniqueFollowUpId = `followup_${timestamp}_${random}`;
 
-  const prompt = `You are an expert interview AI. Generate a follow-up question based on the candidate's previous answer and its sentiment analysis.
+  // Get job description text instead of resume text
+  const jobDescriptionText =
+    interview.jobDescriptionId?.jdText?.substring(0, 1000) ||
+    "No job description data available";
+  const companyName = interview.companyName || "the company";
+
+  const prompt = `You are an expert interview AI for job description-based interviews. Generate a follow-up question based on the candidate's previous answer and its sentiment analysis.
 
 PREVIOUS QUESTION: ${previousQuestion.question}
 CANDIDATE ANSWER: ${answer}
 SENTIMENT ANALYSIS: ${sentiment}
+
 INTERVIEW CONTEXT:
 - Job Role: ${interview.jobRole}
+- Company: ${companyName}
 - Interview Type: ${interview.interviewType}
-- Experience Level: ${interview.level}
+- Experience Level Required: ${interview.level}
 - Difficulty Level: ${interview.difficultyLevel}
-- Resume: ${interview.resumeId.resumeText.substring(0, 1000)}...
+
+JOB DESCRIPTION (excerpt):
+${jobDescriptionText}
 
 SENTIMENT-BASED INSTRUCTIONS:
 ${

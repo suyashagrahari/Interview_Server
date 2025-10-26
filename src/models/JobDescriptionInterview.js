@@ -476,20 +476,40 @@ jobDescriptionInterviewSchema.methods.cancelInterview = function () {
 };
 
 // Instance method to add question
-jobDescriptionInterviewSchema.methods.addQuestion = function (questionData) {
-  console.log(`🔍 DEBUG: Adding question to JD interview ${this._id}:`, {
-    questionId: questionData.questionId,
-    questionType: questionData.questionType || "pool",
-    currentQuestionCount: this.questions.length,
-    stackTrace: new Error().stack.split("\n")[1].trim(),
-  });
+jobDescriptionInterviewSchema.methods.addQuestion = async function (
+  questionData
+) {
+  try {
+    // Validate required fields
+    if (!questionData.questionId) {
+      throw new Error("questionId is required");
+    }
+    if (!questionData.question || typeof questionData.question !== "string") {
+      throw new Error("question must be a non-empty string");
+    }
 
-  this.questions.push({
-    ...questionData,
-    questionType: questionData.questionType || "pool",
-  });
-  this.overallAnalysis.totalQuestions = this.questions.length;
-  return this.save();
+    // Truncate question if it exceeds max length
+    if (questionData.question.length > 1000) {
+      questionData.question = questionData.question.substring(0, 1000);
+    }
+
+    console.log(`🔍 DEBUG: Adding question to JD interview ${this._id}:`, {
+      questionId: questionData.questionId,
+      questionType: questionData.questionType || "pool",
+      currentQuestionCount: this.questions.length,
+      stackTrace: new Error().stack.split("\n")[1].trim(),
+    });
+
+    this.questions.push({
+      ...questionData,
+      questionType: questionData.questionType || "pool",
+    });
+    this.overallAnalysis.totalQuestions = this.questions.length;
+    return await this.save();
+  } catch (error) {
+    console.error(`❌ ERROR adding question to interview ${this._id}:`, error);
+    throw error;
+  }
 };
 
 // Instance method to update answer
@@ -673,4 +693,7 @@ jobDescriptionInterviewSchema.pre("save", function (next) {
   next();
 });
 
-module.exports = mongoose.model("JobDescriptionInterview", jobDescriptionInterviewSchema);
+module.exports = mongoose.model(
+  "JobDescriptionInterview",
+  jobDescriptionInterviewSchema
+);

@@ -1,9 +1,6 @@
-const {
-  ResumeQuestionPool,
-  chatGPTService,
-  logger,
-} = require("./dependencies");
-const ResumeInterview = require("../../../models/ResumeInterview");
+const { chatGPTService, logger } = require("./dependencies");
+const JobDescriptionInterview = require("../../../models/JobDescriptionInterview");
+const JobDescriptionInterviewQuestionPool = require("../../../models/JobDescriptionInterviewQuestionPool");
 const User = require("../../../models/User");
 const generateIntroductionQuestion = require("./generateIntroductionQuestion");
 
@@ -11,17 +8,23 @@ const generateIntroductionQuestion = require("./generateIntroductionQuestion");
  * Generate complete question set (1 introduction + 8 regular questions) for an interview
  * @param {string} interviewId - Interview ID
  * @param {string} userId - User ID
+ * @param {Object} jobDescription - Optional job description object (if already loaded)
  * @returns {Promise<Object>} Generation result
  */
-const generateCompleteQuestionSet = async (interviewId, userId) => {
+const generateCompleteQuestionSet = async (
+  interviewId,
+  userId,
+  jobDescription = null
+) => {
   try {
     // Get interview details
-    const interview = await ResumeInterview.findOne({
+    const interview = await JobDescriptionInterview.findOne({
       _id: interviewId,
       candidateId: userId,
       isActive: true,
-    }).populate("resumeId", "resumeText resumeName");
+    }).populate("jobDescriptionId", "jdText jdName");
 
+    console.log("jdText --->", interview);
     if (!interview) {
       return {
         success: false,
@@ -30,9 +33,10 @@ const generateCompleteQuestionSet = async (interviewId, userId) => {
     }
 
     // Check if questions already exist for this interview
-    const existingQuestionPool = await ResumeQuestionPool.findOne({
-      interviewId: interviewId,
-    });
+    const existingQuestionPool =
+      await JobDescriptionInterviewQuestionPool.findOne({
+        interviewId: interviewId,
+      });
 
     if (existingQuestionPool) {
       return {
@@ -51,15 +55,18 @@ const generateCompleteQuestionSet = async (interviewId, userId) => {
       ? `${candidate.firstName} ${candidate.lastName}`.trim()
       : "Candidate";
 
-    logger.info("Generating complete question set for interview:", {
+    logger.info("Generating complete question set for JD interview:", {
       interviewId,
-      resumeId: interview.resumeId._id,
+      jobDescriptionId: interview.jobDescriptionId._id,
       jobRole: interview.jobRole,
       interviewType: interview.interviewType,
       level: interview.level,
       difficultyLevel: interview.difficultyLevel,
       candidateName,
     });
+
+    // Use the provided jobDescription or the populated one from interview
+    const jdData = jobDescription || interview.jobDescriptionId;
 
     // Generate both introduction and regular questions asynchronously
     const [introductionResult, regularQuestionsResult] = await Promise.all([
@@ -86,10 +93,10 @@ const generateCompleteQuestionSet = async (interviewId, userId) => {
         };
       }),
 
-      // Generate 8 regular questions
+      // Generate 8 regular questions based on job description
       chatGPTService
-        .generateInterviewQuestions({
-          resumeText: interview.resumeId.resumeText,
+        .generateInterviewQuestionsFromJD({
+          jdText: jdData.jdText,
           interviewType: interview.interviewType,
           level: interview.level,
           difficultyLevel: interview.difficultyLevel,
@@ -146,8 +153,8 @@ const generateCompleteQuestionSet = async (interviewId, userId) => {
     }
 
     // Create question pool with all questions
-    const questionPool = new ResumeQuestionPool({
-      resumeId: interview.resumeId._id,
+    const questionPool = new JobDescriptionInterviewQuestionPool({
+      jobDescriptionId: interview.jobDescriptionId._id,
       interviewId: interviewId,
       userId: userId,
       interviewType: interview.interviewType,
@@ -160,14 +167,17 @@ const generateCompleteQuestionSet = async (interviewId, userId) => {
 
     await questionPool.save();
 
-    logger.info("Complete question set generated successfully", {
-      interviewId,
-      questionPoolId: questionPool._id,
-      questionCount: allQuestions.length,
-      introductionQuestion: allQuestions[0].questionId,
-      regularQuestionsCount: allQuestions.length - 1,
-      totalTokensUsed: regularQuestionsResult.totalTokensUsed || 0,
-    });
+    logger.info(
+      "Complete question set generated successfully for JD interview",
+      {
+        interviewId,
+        questionPoolId: questionPool._id,
+        questionCount: allQuestions.length,
+        introductionQuestion: allQuestions[0].questionId,
+        regularQuestionsCount: allQuestions.length - 1,
+        totalTokensUsed: regularQuestionsResult.totalTokensUsed || 0,
+      }
+    );
 
     return {
       success: true,

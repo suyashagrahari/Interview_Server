@@ -303,9 +303,10 @@ const getNextQuestionFromPool = async (interview, currentQuestionNumber) => {
         interview.questions[interview.questions.length - 1];
 
       // Use appropriate analysis service based on interview type
-      const AnalysisService = interviewType === "job-description"
-        ? require("../jobDescriptionServices/jobDescriptionAnalysisService")
-        : require("../resumeServices/resumeAnalysisService");
+      const AnalysisService =
+        interviewType === "job-description"
+          ? require("../jobDescriptionServices/jobDescriptionAnalysisService")
+          : require("../resumeServices/resumeAnalysisService");
 
       const followUpQuestion = await AnalysisService.generateFollowUpQuestion(
         interview,

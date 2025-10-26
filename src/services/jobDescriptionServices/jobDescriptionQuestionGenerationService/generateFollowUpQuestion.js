@@ -1,8 +1,8 @@
 const { chatGPTService, logger } = require("./dependencies");
 
 /**
- * Generate follow-up question based on previous answer
- * @param {Object} interview - Interview object
+ * Generate follow-up question based on previous answer for job description interviews
+ * @param {Object} interview - Interview object (with populated jobDescriptionId)
  * @param {Object} previousQuestion - Previous question object
  * @param {string} answer - Previous answer
  * @param {number} questionIndex - Current question index
@@ -19,23 +19,35 @@ const generateFollowUpQuestion = async (
       ? questionIndex
       : 0;
 
-  const prompt = `Generate a follow-up question for an interview.
+  // Get job description text instead of resume text
+  const jobDescriptionText =
+    interview.jobDescriptionId?.jdText?.substring(0, 1000) ||
+    "No job description data available";
+  const companyName = interview.companyName || "the company";
+
+  const prompt = `Generate a follow-up question for a job description-based interview.
 
 PREVIOUS QUESTION: ${previousQuestion.question}
 CANDIDATE ANSWER: ${answer}
+
 INTERVIEW CONTEXT:
 - Job Role: ${interview.jobRole}
+- Company: ${companyName}
 - Interview Type: ${interview.interviewType}
-- Experience Level: ${interview.level}
+- Experience Level Required: ${interview.level}
 - Difficulty Level: ${interview.difficultyLevel}
-- Resume: ${interview.resumeId.resumeText.substring(0, 1000)}...
+
+JOB DESCRIPTION (excerpt):
+${jobDescriptionText}
 
 Generate a relevant follow-up question that:
 1. Builds on the previous answer
 2. Goes deeper into the topic
-3. Tests different aspects of their knowledge
-4. Is appropriate for their experience level
-5. Is a natural progression from the previous question
+3. Relates to the job requirements and responsibilities
+4. Tests different aspects of their knowledge and experience
+5. Is appropriate for the required experience level
+6. Is a natural progression from the previous question
+7. Assesses how well they fit the job description requirements
 
 Respond with JSON format:
 {

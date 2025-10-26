@@ -379,8 +379,6 @@ class InterviewHandlerService {
         message: "Analyzing your answer...",
       });
 
-      // Interview type already detected above
-
       const { InterviewModel } =
         interviewType === "job-description"
           ? { InterviewModel: require("../../models/JobDescriptionInterview") }
@@ -875,8 +873,6 @@ class InterviewHandlerService {
         }
       }
 
-      // Interview type already detected above
-
       const { InterviewModel } =
         interviewType === "job-description"
           ? { InterviewModel: require("../../models/JobDescriptionInterview") }
@@ -969,22 +965,20 @@ class InterviewHandlerService {
     try {
       logger.info(`🔍 Updating proctoring data for interview ${interviewId}`);
 
+      // Detect interview type first
+      const interviewType =
+        await UnifiedQuestionManagementService.detectInterviewType(interviewId);
+      if (!interviewType) {
+        socket.emit("proctoring:error", {
+          success: false,
+          message: "Interview not found",
+        });
+        return;
+      }
+
       // If userId is a fallback, fetch actual candidateId
       let effectiveUserId = userId;
       if (userId && userId.startsWith("interview-")) {
-        // Detect interview type first
-        const interviewType =
-          await UnifiedQuestionManagementService.detectInterviewType(
-            interviewId
-          );
-        if (!interviewType) {
-          socket.emit("proctoring:error", {
-            success: false,
-            message: "Interview not found",
-          });
-          return;
-        }
-
         // Get the appropriate interview model
         const { InterviewModel } =
           interviewType === "job-description"
@@ -998,8 +992,6 @@ class InterviewHandlerService {
           effectiveUserId = tempInterview.candidateId.toString();
         }
       }
-
-      // Interview type already detected above
 
       const { InterviewModel } =
         interviewType === "job-description"
@@ -1052,22 +1044,20 @@ class InterviewHandlerService {
     try {
       logger.info(`📊 Fetching proctoring data for interview ${interviewId}`);
 
+      // Detect interview type first
+      const interviewType =
+        await UnifiedQuestionManagementService.detectInterviewType(interviewId);
+      if (!interviewType) {
+        socket.emit("proctoring:error", {
+          success: false,
+          message: "Interview not found",
+        });
+        return;
+      }
+
       // If userId is a fallback, fetch actual candidateId
       let effectiveUserId = userId;
       if (userId && userId.startsWith("interview-")) {
-        // Detect interview type first
-        const interviewType =
-          await UnifiedQuestionManagementService.detectInterviewType(
-            interviewId
-          );
-        if (!interviewType) {
-          socket.emit("proctoring:error", {
-            success: false,
-            message: "Interview not found",
-          });
-          return;
-        }
-
         // Get the appropriate interview model
         const { InterviewModel } =
           interviewType === "job-description"
@@ -1081,8 +1071,6 @@ class InterviewHandlerService {
           effectiveUserId = tempInterview.candidateId.toString();
         }
       }
-
-      // Interview type already detected above
 
       const { InterviewModel } =
         interviewType === "job-description"

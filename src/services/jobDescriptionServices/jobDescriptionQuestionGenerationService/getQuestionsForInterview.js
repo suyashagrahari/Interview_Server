@@ -1,14 +1,15 @@
-const { ResumeQuestionPool, logger } = require("./dependencies");
+const { logger } = require("./dependencies");
+const JobDescriptionInterviewQuestionPool = require("../../../models/JobDescriptionInterviewQuestionPool");
 
 /**
- * Get questions for an interview
+ * Get questions for a job description interview
  * @param {string} interviewId - Interview ID
  * @param {string} userId - User ID
  * @returns {Promise<Object>} Questions result
  */
 const getQuestionsForInterview = async (interviewId, userId) => {
   try {
-    const questionPool = await ResumeQuestionPool.findOne({
+    const questionPool = await JobDescriptionInterviewQuestionPool.findOne({
       interviewId: interviewId,
       userId: userId,
     });
@@ -29,7 +30,7 @@ const getQuestionsForInterview = async (interviewId, userId) => {
       },
     };
   } catch (error) {
-    logger.error("Error getting questions for interview:", error);
+    logger.error("Error getting questions for JD interview:", error);
     return {
       success: false,
       message: "Error retrieving questions",
