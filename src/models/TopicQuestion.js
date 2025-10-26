@@ -21,6 +21,11 @@ const topicQuestionSchema = new mongoose.Schema(
       required: [true, "Difficulty level is required"],
       enum: ["beginner", "intermediate", "expert"],
     },
+    questionType: {
+      type: String,
+      enum: ["technical", "behavioral", "coding", "systemDesign", "normal"],
+      default: "technical",
+    },
     questionText: {
       type: String,
       required: [true, "Question text is required"],
@@ -53,6 +58,7 @@ const topicQuestionSchema = new mongoose.Schema(
 topicQuestionSchema.index({ topicName: 1 });
 topicQuestionSchema.index({ experienceLevel: 1 });
 topicQuestionSchema.index({ difficultyLevel: 1 });
+topicQuestionSchema.index({ questionType: 1 });
 topicQuestionSchema.index({ createdAt: -1 });
 
 /**

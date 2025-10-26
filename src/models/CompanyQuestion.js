@@ -29,7 +29,8 @@ const companyQuestionSchema = new mongoose.Schema(
     questionType: {
       type: String,
       required: [true, "Question type is required"],
-      enum: ["Code", "SystemDesign", "Normal"],
+      enum: ["technical", "behavioral", "coding", "systemDesign", "normal"],
+      default: "technical",
     },
     questionText: {
       type: String,
