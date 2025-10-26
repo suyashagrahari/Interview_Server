@@ -20,3 +20,4 @@ class JobDescriptionInterviewService {
 // Export both the class and individual functions
 module.exports = JobDescriptionInterviewService;
 module.exports.endInterview = endInterview;
+
