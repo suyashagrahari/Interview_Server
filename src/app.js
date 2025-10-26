@@ -26,6 +26,11 @@ const resumeInterviewRoutes = require("./routes/resumeInterview");
 const jobDescriptionInterviewRoutes = require("./routes/jobDescriptionInterview");
 const interviewerRoutes = require("./routes/interviewer");
 const ttsRoutes = require("./routes/tts");
+const companyTitleRoutes = require("./routes/companyTitle");
+const companyQuestionRoutes = require("./routes/companyQuestion");
+const topicTitleRoutes = require("./routes/topicTitle");
+const topicQuestionRoutes = require("./routes/topicQuestion");
+const jobTitleRoutes = require("./routes/jobTitle");
 
 // Import database
 const database = require("./config/database");
@@ -82,6 +87,11 @@ app.use("/api/resume-interview", resumeInterviewRoutes);
 app.use("/api/job-description-interview", jobDescriptionInterviewRoutes);
 app.use("/api/interviewers", interviewerRoutes);
 app.use("/api/tts", ttsRoutes);
+app.use("/api/company-titles", companyTitleRoutes);
+app.use("/api/company-questions", companyQuestionRoutes);
+app.use("/api/topic-titles", topicTitleRoutes);
+app.use("/api/topic-questions", topicQuestionRoutes);
+app.use("/api/job-titles", jobTitleRoutes);
 
 // Serve static files for uploads (audio/voice files)
 app.use("/uploads", express.static("uploads"));
