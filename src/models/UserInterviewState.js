@@ -33,6 +33,10 @@ const userInterviewStateSchema = new mongoose.Schema(
           "job-description",
           "topic",
           "company",
+          "resume-based", // backward compatibility
+          "job-description-based", // backward compatibility
+          "topic-based", // backward compatibility
+          "company-based", // backward compatibility
         ],
         default: "resume",
       },
@@ -107,6 +111,10 @@ const userInterviewStateSchema = new mongoose.Schema(
             "job-description",
             "topic",
             "company",
+            "resume-based", // backward compatibility
+            "job-description-based", // backward compatibility
+            "topic-based", // backward compatibility
+            "company-based", // backward compatibility
           ],
         },
         status: {

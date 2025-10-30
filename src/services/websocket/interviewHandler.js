@@ -6,6 +6,7 @@ const ResumeQuestionManagementService = require("../resumeServices/resumeQuestio
 const UnifiedQuestionManagementService = require("../unifiedQuestionManagementService");
 const JobDescriptionInterviewHandler = require("../jobDescriptionServices/jobDescriptionWebSocketHandlers/jobDescriptionInterviewWebSocketHandler");
 const JobDescriptionQuestionManagementService = require("../jobDescriptionServices/jobDescriptionQuestionManagementService");
+const TopicInterviewWebSocketHandler = require("../topicServices/topicWebSocketHandlers/topicInterviewWebSocketHandler");
 const ResumeAnalysisService = require("../resumeServices/resumeAnalysisService");
 
 // Shared services
@@ -72,6 +73,15 @@ class InterviewHandlerService {
       }
 
       // Route to appropriate handler based on interview type
+      if (interviewType === "topic") {
+        // Initialize topic interview handler
+        const topicHandler = new TopicInterviewWebSocketHandler(this.io);
+        return await topicHandler.handleGenerateFirstQuestion(socket, {
+          interviewId,
+          userId,
+        });
+      }
+
       if (interviewType === "job-description") {
         return await JobDescriptionInterviewHandler.handleGenerateFirstQuestion(
           socket,
@@ -319,6 +329,18 @@ class InterviewHandlerService {
       }
 
       // Route to appropriate handler based on interview type
+      if (interviewType === "topic") {
+        // Initialize topic interview handler
+        const topicHandler = new TopicInterviewWebSocketHandler(this.io);
+        return await topicHandler.handleSubmitAnswer(socket, {
+          interviewId,
+          questionId,
+          userId,
+          answer,
+          proctoringData,
+        });
+      }
+
       if (interviewType === "job-description") {
         return await JobDescriptionInterviewHandler.handleSubmitAnswer(socket, {
           interviewId,

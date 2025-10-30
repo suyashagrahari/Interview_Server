@@ -1,10 +1,12 @@
 // Unified Question Management Service
-// Handles both resume-based and job description-based interviews
+// Handles resume-based, job description-based, and topic-based interviews
 const ResumeInterview = require("../../models/ResumeInterview");
 const JobDescriptionInterview = require("../../models/JobDescriptionInterview");
+const TopicInterview = require("../../models/TopicInterview");
 const ResumeQuestionPool = require("../../models/ResumeInterviewQuestionPool");
 const JobDescriptionInterviewQuestionPool = require("../../models/JobDescriptionInterviewQuestionPool");
 const JobDescriptionQuestionManagementService = require("../jobDescriptionServices/jobDescriptionQuestionManagementService");
+const TopicInterviewWebSocketHandler = require("../topicServices/topicWebSocketHandlers/topicInterviewWebSocketHandler");
 const logger = require("../../utils/logger");
 const mongoose = require("mongoose");
 
@@ -30,7 +32,7 @@ const getInterviewModels = (interviewType) => {
 };
 
 /**
- * Detect interview type from interview ID by checking both models
+ * Detect interview type from interview ID by checking all models
  */
 const detectInterviewType = async (interviewId) => {
   try {
@@ -39,7 +41,15 @@ const detectInterviewType = async (interviewId) => {
       return null;
     }
 
-    // Check job description interview first
+    // Check topic interview first
+    const topicInterview = await TopicInterview.findOne({
+      _id: interviewId,
+    });
+    if (topicInterview) {
+      return "topic";
+    }
+
+    // Check job description interview
     const jdInterview = await JobDescriptionInterview.findOne({
       _id: interviewId,
     });
