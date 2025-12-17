@@ -53,3 +53,4 @@ exports.buildCoverLetterHtml = async (params) => {
     throw err;
   }
 };
+
