@@ -88,6 +88,37 @@ const parseDoc = async (filePath) => {
 };
 
 /**
+ * Parse TXT file and extract text content
+ * @param {string} filePath - Path to the TXT file
+ * @returns {Promise<{text: string, success: boolean, errors: string[]}>}
+ */
+const parseTxt = async (filePath) => {
+  try {
+    const text = fs.readFileSync(filePath, "utf8").trim();
+
+    if (!text) {
+      return {
+        text: "",
+        success: false,
+        errors: ["No text content found in the TXT file"],
+      };
+    }
+
+    return {
+      text,
+      success: true,
+      errors: [],
+    };
+  } catch (error) {
+    return {
+      text: "",
+      success: false,
+      errors: [`Failed to parse TXT file: ${error.message}`],
+    };
+  }
+};
+
+/**
  * Get file extension from file path
  * @param {string} filePath - Path to the file
  * @returns {string} - File extension in lowercase
@@ -111,12 +142,14 @@ const parseFile = async (filePath) => {
       return await parsePdf(filePath);
     case "doc":
       return await parseDoc(filePath);
+    case "txt":
+      return await parseTxt(filePath);
     default:
       return {
         text: "",
         success: false,
         errors: [
-          `Unsupported file type: ${extension}. Supported types are PDF, DOC, and DOCX.`,
+          `Unsupported file type: ${extension}. Supported types are PDF, DOC, DOCX, and TXT.`,
         ],
       };
   }
@@ -151,19 +184,20 @@ const validateFile = (file) => {
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
   ];
   if (!allowedTypes.includes(file.mimetype)) {
     errors.push(
-      `Invalid file type: ${file.mimetype}. Allowed types are PDF, DOC, and DOCX.`
+      `Invalid file type: ${file.mimetype}. Allowed types are PDF, DOC, DOCX, and TXT.`
     );
   }
 
   // Check file extension
   const extension = getFileExtension(file.originalname);
-  const allowedExtensions = ["pdf", "doc", "docx"];
+  const allowedExtensions = ["pdf", "doc", "docx", "txt"];
   if (!allowedExtensions.includes(extension)) {
     errors.push(
-      `Invalid file extension: ${extension}. Allowed extensions are .pdf, .doc, and .docx.`
+      `Invalid file extension: ${extension}. Allowed extensions are .pdf, .doc, .docx, and .txt.`
     );
   }
 
@@ -178,6 +212,7 @@ module.exports = {
   parseDocx,
   parsePdf,
   parseDoc,
+  parseTxt,
   validateFile,
   getFileExtension,
 };

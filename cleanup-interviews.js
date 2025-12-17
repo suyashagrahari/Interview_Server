@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Interview = require("./src/models/Interview");
+const ResumeInterview = require("./src/models/Interview");
 
 // Connect to MongoDB
 mongoose.connect("mongodb://localhost:27017/interview_practice", {
@@ -12,7 +12,7 @@ async function cleanupInterviews() {
     console.log("Connecting to database...");
 
     // Find all active interviews
-    const activeInterviews = await Interview.find({
+    const activeInterviews = await ResumeInterview.find({
       status: { $in: ["scheduled", "in_progress"] },
       isActive: true,
     });
@@ -26,7 +26,7 @@ async function cleanupInterviews() {
 
     if (activeInterviews.length > 0) {
       // Update all active interviews to completed status
-      const result = await Interview.updateMany(
+      const result = await ResumeInterview.updateMany(
         {
           status: { $in: ["scheduled", "in_progress"] },
           isActive: true,

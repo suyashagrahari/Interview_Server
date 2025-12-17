@@ -1,4 +1,5 @@
-const Interview = require("../../models/Interview");
+const ResumeInterview = require("../../models/ResumeInterview");
+const mongoose = require("mongoose");
 
 class InterviewTimerService {
   constructor(io) {
@@ -18,7 +19,14 @@ class InterviewTimerService {
     // Update time every second
     const intervalId = setInterval(async () => {
       try {
-        const interview = await Interview.findById(interviewId);
+        // Validate ObjectId before querying
+        if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+          console.error(`❌ Invalid interview ID format: ${interviewId}`);
+          this.stopTimer(interviewId);
+          return;
+        }
+
+        const interview = await ResumeInterview.findById(interviewId);
 
         if (!interview || interview.status !== "in_progress") {
           console.log(`⏹️  Stopping timer for interview ${interviewId} - not active`);
@@ -88,7 +96,13 @@ class InterviewTimerService {
    */
   async getTimeRemaining(interviewId) {
     try {
-      const interview = await Interview.findById(interviewId);
+      // Validate ObjectId before querying
+      if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+        console.error(`❌ Invalid interview ID format: ${interviewId}`);
+        return { success: false, timeRemaining: 0 };
+      }
+
+      const interview = await ResumeInterview.findById(interviewId);
 
       if (!interview || !interview.startedAt) {
         return { success: false, timeRemaining: 0 };

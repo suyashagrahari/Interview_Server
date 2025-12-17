@@ -40,7 +40,13 @@ class TTSService {
    * @param {string} questionId - Question ID for cleanup tracking
    * @returns {Promise<Object|null>} Object with filePath, fileName, and url
    */
-  async generateSpeech(text, fileName = null, outputDir = "voice", userId = null, questionId = null) {
+  async generateSpeech(
+    text,
+    fileName = null,
+    outputDir = "voice",
+    userId = null,
+    questionId = null
+  ) {
     if (!text || !text.trim()) {
       logger.error("TTS Error: Text cannot be empty");
       return { success: false, message: "Text cannot be empty" };
@@ -54,7 +60,9 @@ class TTSService {
       let finalFileName;
       if (fileName) {
         // Ensure fileName has .mp3 extension
-        finalFileName = fileName.endsWith('.mp3') ? fileName : `${fileName}.mp3`;
+        finalFileName = fileName.endsWith(".mp3")
+          ? fileName
+          : `${fileName}.mp3`;
       } else if (userId && questionId) {
         finalFileName = `user-${userId}-question-${questionId}-${timestamp}.mp3`;
       } else {
@@ -68,8 +76,10 @@ class TTSService {
       if (userId) {
         try {
           const files = await fs.readdir(targetDir);
-          const userFiles = files.filter(file =>
-            file.startsWith(`user-${userId}-question-`) && file !== finalFileName
+          const userFiles = files.filter(
+            (file) =>
+              file.startsWith(`user-${userId}-question-`) &&
+              file !== finalFileName
           );
 
           for (const file of userFiles) {
@@ -102,54 +112,65 @@ class TTSService {
 
       return new Promise((resolve, reject) => {
         speech.save(filePath, async (err) => {
-          if (err) {
-            logger.error("Error generating speech:", err);
-            reject({
-              success: false,
-              message: "Failed to generate speech",
-              error: err,
-            });
-            return;
-          }
-
-          // Wait a bit to ensure file is fully written to disk
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-          // Verify file exists and has content
           try {
-            const stats = await fs.stat(filePath);
-            if (stats.size === 0) {
-              logger.error("Generated audio file is empty");
+            if (err) {
+              logger.error("Error generating speech:", err);
               reject({
                 success: false,
-                message: "Generated audio file is empty",
+                message: "Failed to generate speech",
+                error: err,
               });
               return;
             }
-            logger.info(`✅ Speech generated successfully: ${finalFileName} (${stats.size} bytes)`);
-          } catch (statError) {
-            logger.error("Error verifying audio file:", statError);
+
+            // Wait a bit to ensure file is fully written to disk
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Verify file exists and has content
+            try {
+              const stats = await fs.stat(filePath);
+              if (stats.size === 0) {
+                logger.error("Generated audio file is empty");
+                reject({
+                  success: false,
+                  message: "Generated audio file is empty",
+                });
+                return;
+              }
+              logger.info(
+                `✅ Speech generated successfully: ${finalFileName} (${stats.size} bytes)`
+              );
+            } catch (statError) {
+              logger.error("Error verifying audio file:", statError);
+              reject({
+                success: false,
+                message: "Failed to verify audio file",
+                error: statError,
+              });
+              return;
+            }
+
+            const relativePath = path.relative(
+              path.join(__dirname, "../.."),
+              filePath
+            );
+            const url = `/uploads/${outputDir}/${finalFileName}`;
+
+            resolve({
+              success: true,
+              filePath,
+              fileName: finalFileName,
+              url,
+              relativePath,
+            });
+          } catch (callbackError) {
+            logger.error("Error in speech save callback:", callbackError);
             reject({
               success: false,
-              message: "Failed to verify audio file",
-              error: statError,
+              message: "Internal error in speech generation callback",
+              error: callbackError,
             });
-            return;
           }
-
-          const relativePath = path.relative(
-            path.join(__dirname, "../.."),
-            filePath
-          );
-          const url = `/uploads/${outputDir}/${finalFileName}`;
-
-          resolve({
-            success: true,
-            filePath,
-            fileName: finalFileName,
-            url,
-            relativePath,
-          });
         });
       });
     } catch (error) {
@@ -170,8 +191,19 @@ class TTSService {
    * @param {string} questionId - Question ID for cleanup tracking
    * @returns {Promise<Object>} Object with success, filePath, fileName, and stream
    */
-  async generateSpeechStream(text, fileName = null, userId = null, questionId = null) {
-    const result = await this.generateSpeech(text, fileName, "voice", userId, questionId);
+  async generateSpeechStream(
+    text,
+    fileName = null,
+    userId = null,
+    questionId = null
+  ) {
+    const result = await this.generateSpeech(
+      text,
+      fileName,
+      "voice",
+      userId,
+      questionId
+    );
 
     if (!result.success) {
       return result;

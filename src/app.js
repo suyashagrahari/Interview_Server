@@ -21,9 +21,18 @@ const { errorHandler, notFound } = require("./middleware/errorHandler");
 // Import routes
 const authRoutes = require("./routes/auth");
 const resumeRoutes = require("./routes/resume");
-const interviewRoutes = require("./routes/interview");
+const jdRoutes = require("./routes/jd");
+const resumeInterviewRoutes = require("./routes/resumeInterview");
+const jobDescriptionInterviewRoutes = require("./routes/jobDescriptionInterview");
+const topicInterviewRoutes = require("./routes/topicInterview");
 const interviewerRoutes = require("./routes/interviewer");
 const ttsRoutes = require("./routes/tts");
+const companyTitleRoutes = require("./routes/companyTitle");
+const companyQuestionRoutes = require("./routes/companyQuestion");
+const topicTitleRoutes = require("./routes/topicTitle");
+const topicQuestionRoutes = require("./routes/topicQuestion");
+const jobTitleRoutes = require("./routes/jobTitle");
+const coverLetterRoutes = require("./routes/coverLetter");
 
 // Import database
 const database = require("./config/database");
@@ -75,9 +84,18 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
-app.use("/api/interview", interviewRoutes);
+app.use("/api/jd", jdRoutes);
+app.use("/api/resume-interview", resumeInterviewRoutes);
+app.use("/api/job-description-interview", jobDescriptionInterviewRoutes);
+app.use("/api/topic-interview", topicInterviewRoutes);
 app.use("/api/interviewers", interviewerRoutes);
 app.use("/api/tts", ttsRoutes);
+app.use("/api/company-titles", companyTitleRoutes);
+app.use("/api/company-questions", companyQuestionRoutes);
+app.use("/api/topic-titles", topicTitleRoutes);
+app.use("/api/topic-questions", topicQuestionRoutes);
+app.use("/api/job-titles", jobTitleRoutes);
+app.use("/api/cover-letter", coverLetterRoutes);
 
 // Serve static files for uploads (audio/voice files)
 app.use("/uploads", express.static("uploads"));
@@ -85,7 +103,9 @@ app.use("/uploads", express.static("uploads"));
 // Serve test HTML file (development only)
 if (process.env.NODE_ENV === "development" || !process.env.NODE_ENV) {
   app.get("/test-audio", (req, res) => {
-    res.sendFile(require('path').join(__dirname, "../test-audio-playback.html"));
+    res.sendFile(
+      require("path").join(__dirname, "../test-audio-playback.html")
+    );
   });
 }
 

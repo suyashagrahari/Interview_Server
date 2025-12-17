@@ -8,14 +8,26 @@ const HOST = process.env.HOST || "localhost";
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
-  logger.error("Uncaught Exception! Shutting down...", err);
-  process.exit(1);
+  logger.error("Uncaught Exception! Shutting down...");
+  logger.error("Error details:", {
+    message: err.message,
+    stack: err.stack,
+    name: err.name,
+  });
+  console.error("Full error object:", err);
+  // Give time for logs to be written
+  setTimeout(() => process.exit(1), 100);
 });
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (err) => {
-  logger.error("Unhandled Rejection! Shutting down...", err);
-  process.exit(1);
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error("Unhandled Rejection! Shutting down...");
+  logger.error("Error details:", {
+    reason,
+    promise,
+  });
+  // Give time for logs to be written
+  setTimeout(() => process.exit(1), 100);
 });
 
 // Create HTTP server

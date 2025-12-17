@@ -5,14 +5,17 @@
 /**
  * Validate interview creation request
  * @param {Object} reqBody - Request body containing interview data
+ * @param {String} interviewSource - 'resume' or 'jobDescription'
  * @returns {Object} Validation result with isValid flag and errors array
  */
-const validateInterviewRequest = (reqBody) => {
+const validateInterviewRequest = (reqBody, interviewSource = "resume") => {
   const {
     resumeId,
+    jobDescriptionId,
     interviewType,
     level,
     difficultyLevel,
+    experienceLevel,
     jobRole,
     interviewerId,
     interviewer,
@@ -20,39 +23,77 @@ const validateInterviewRequest = (reqBody) => {
 
   const errors = [];
 
-  // Validate required fields
-  if (
-    !resumeId ||
-    !interviewType ||
-    !level ||
-    !difficultyLevel ||
-    !jobRole ||
-    !interviewerId
+  // Validate source-specific required field
+  if (interviewSource === "resume") {
+    if (!resumeId) {
+      errors.push("resumeId is required for resume-based interviews");
+    }
+  } else if (interviewSource === "jobDescription") {
+    if (!jobDescriptionId) {
+      errors.push(
+        "jobDescriptionId is required for job description-based interviews"
+      );
+    }
+  }
+
+  // Validate common required fields
+  if (!interviewType) {
+    errors.push("interviewType is required");
+  } else if (!["technical", "behavioral"].includes(interviewType)) {
+    errors.push("interviewType must be either 'technical' or 'behavioral'");
+  }
+
+  // Validate level or experienceLevel (at least one should be present)
+  if (!level && !experienceLevel) {
+    errors.push("Either level or experienceLevel is required");
+  }
+
+  if (level && !["0-2", "3-4", "5-6", "7-8", "9-10"].includes(level)) {
+    errors.push("level must be one of: '0-2', '3-4', '5-6', '7-8', '9-10'");
+  }
+
+  if (!difficultyLevel) {
+    errors.push("difficultyLevel is required");
+  } else if (
+    !["beginner", "intermediate", "expert"].includes(difficultyLevel)
   ) {
     errors.push(
-      "Missing required fields: resumeId, interviewType, level, difficultyLevel, jobRole, interviewerId"
+      "difficultyLevel must be 'beginner', 'intermediate', or 'expert'"
     );
+  }
+
+  // jobRole is required for resume interviews but optional for job description interviews
+  if (interviewSource === "resume") {
+    if (!jobRole || jobRole.trim() === "") {
+      errors.push("jobRole is required and cannot be empty");
+    }
+  }
+
+  if (!interviewerId) {
+    errors.push("interviewerId is required");
   }
 
   // Validate interviewer details
-  if (
-    !interviewer ||
-    !interviewer.name ||
-    !interviewer.experience ||
-    !interviewer.bio
-  ) {
-    errors.push(
-      "Missing required interviewer details: name, experience, and bio are required"
-    );
+  if (!interviewer) {
+    errors.push("interviewer object is required");
+  } else {
+    if (!interviewer.name || interviewer.name.trim() === "") {
+      errors.push("interviewer.name is required and cannot be empty");
+    }
+    if (!interviewer.experience || interviewer.experience.trim() === "") {
+      errors.push("interviewer.experience is required and cannot be empty");
+    }
+    if (!interviewer.bio || interviewer.bio.trim() === "") {
+      errors.push("interviewer.bio is required and cannot be empty");
+    }
   }
 
   // Validate number of interviewers
-  if (
-    interviewer?.numberOfInterviewers &&
-    (interviewer.numberOfInterviewers < 1 ||
-      interviewer.numberOfInterviewers > 10)
-  ) {
-    errors.push("Number of interviewers must be between 1 and 10");
+  if (interviewer?.numberOfInterviewers !== undefined) {
+    const numInterviewers = parseInt(interviewer.numberOfInterviewers);
+    if (isNaN(numInterviewers) || numInterviewers < 1 || numInterviewers > 10) {
+      errors.push("interviewer.numberOfInterviewers must be between 1 and 10");
+    }
   }
 
   return {
