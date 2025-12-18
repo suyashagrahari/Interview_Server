@@ -1,6 +1,6 @@
 const path = require("path");
 const fs = require("fs").promises;
-const gTTS = require("gtts");
+const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
 const logger = require("../../utils/logger");
 
@@ -104,75 +104,227 @@ class TTSService {
       logger.info(
         `Generating speech for: "${text.substring(0, 50)}${
           text.length > 50 ? "..." : ""
-        }"`
+        }" (${text.length} characters)`
       );
 
-      // Generate speech with gTTS
-      const speech = new gTTS(text, "en");
+      // Calculate dynamic timeout based on text length
+      // Use a very high timeout to avoid premature timeouts (5 minutes max)
+      // Base timeout: 2 minutes, add 2 seconds per 50 characters
+      const baseTimeout = 120000; // 2 minutes
+      const additionalTimeout = Math.ceil(text.length / 50) * 2000; // 2 seconds per 50 chars
+      const timeout = Math.min(baseTimeout + additionalTimeout, 300000); // Max 5 minutes
 
-      return new Promise((resolve, reject) => {
-        speech.save(filePath, async (err) => {
-          try {
-            if (err) {
-              logger.error("Error generating speech:", err);
-              reject({
-                success: false,
-                message: "Failed to generate speech",
-                error: err,
-              });
-              return;
-            }
+      logger.info(
+        `Using timeout: ${timeout}ms (${timeout / 1000}s) for ${
+          text.length
+        } characters`
+      );
 
-            // Wait a bit to ensure file is fully written to disk
-            await new Promise((resolve) => setTimeout(resolve, 100));
+      // Generate speech using Kokoro API with retry logic
+      const maxRetries = 5; // Increased retries
+      const retryDelay = 5000; // 5 seconds between retries (increased for server startup time)
+      let lastError = null;
 
-            // Verify file exists and has content
-            try {
-              const stats = await fs.stat(filePath);
-              if (stats.size === 0) {
-                logger.error("Generated audio file is empty");
-                reject({
-                  success: false,
-                  message: "Generated audio file is empty",
-                });
-                return;
-              }
-              logger.info(
-                `✅ Speech generated successfully: ${finalFileName} (${stats.size} bytes)`
-              );
-            } catch (statError) {
-              logger.error("Error verifying audio file:", statError);
-              reject({
-                success: false,
-                message: "Failed to verify audio file",
-                error: statError,
-              });
-              return;
-            }
-
-            const relativePath = path.relative(
-              path.join(__dirname, "../.."),
-              filePath
-            );
-            const url = `/uploads/${outputDir}/${finalFileName}`;
-
-            resolve({
-              success: true,
-              filePath,
-              fileName: finalFileName,
-              url,
-              relativePath,
-            });
-          } catch (callbackError) {
-            logger.error("Error in speech save callback:", callbackError);
-            reject({
-              success: false,
-              message: "Internal error in speech generation callback",
-              error: callbackError,
-            });
+      // Helper to check if server is reachable (simple connection test)
+      const isServerReachable = async () => {
+        try {
+          const testClient = axios.create({ timeout: 3000 });
+          // Try to connect - even if endpoint doesn't exist, connection should work
+          await testClient.get("http://localhost:8880", {
+            validateStatus: () => true, // Accept any status
+          });
+          return true;
+        } catch (error) {
+          // ECONNREFUSED means server is not running
+          if (error.code === "ECONNREFUSED") {
+            return false;
           }
-        });
-      });
+          // Other errors might mean server is running but endpoint doesn't exist (which is OK)
+          return true;
+        }
+      };
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const startTime = Date.now();
+        try {
+          if (attempt > 1) {
+            logger.info(
+              `🔄 Retry attempt ${attempt}/${maxRetries} for Kokoro API`
+            );
+            // Check if server is reachable before retrying
+            logger.info("🔍 Checking if Kokoro API server is reachable...");
+            const reachable = await isServerReachable();
+            if (!reachable) {
+              logger.warn(
+                `⚠️ Server not reachable, waiting ${retryDelay}ms before retry...`
+              );
+            } else {
+              logger.info("✅ Server is reachable, proceeding with request...");
+            }
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          }
+
+          logger.info(
+            `🚀 Making request to Kokoro API (attempt ${attempt}/${maxRetries}) at ${new Date().toISOString()}`
+          );
+          logger.info(
+            `📋 Request config: timeout=${timeout}ms, textLength=${text.length}`
+          );
+
+          // Create a fresh axios instance to avoid any global defaults
+          const axiosInstance = axios.create();
+
+          // Use axios instance with explicit timeout in request config
+          const response = await axiosInstance.post(
+            "http://localhost:8880/v1/audio/speech",
+            {
+              model: "kokoro",
+              input: text,
+              voice: "af_sky",
+              response_format: "mp3",
+              speed: 1.0,
+            },
+            {
+              timeout: timeout, // Very high timeout to avoid premature cancellation
+              responseType: "arraybuffer", // Important: receive binary data
+              maxContentLength: Infinity,
+              maxBodyLength: Infinity,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              validateStatus: (status) => {
+                return status >= 200 && status < 300;
+              },
+            }
+          );
+
+          const elapsedTime = Date.now() - startTime;
+          logger.info(
+            `✅ API response received in ${elapsedTime}ms (${
+              elapsedTime / 1000
+            }s)`
+          );
+
+          // Save the audio buffer to file
+          await fs.writeFile(filePath, Buffer.from(response.data));
+
+          // Verify file exists and has content
+          const stats = await fs.stat(filePath);
+          if (stats.size === 0) {
+            logger.error("Generated audio file is empty");
+            return {
+              success: false,
+              message: "Generated audio file is empty",
+            };
+          }
+
+          logger.info(
+            `✅ Speech generated successfully: ${finalFileName} (${stats.size} bytes)`
+          );
+
+          const relativePath = path.relative(
+            path.join(__dirname, "../.."),
+            filePath
+          );
+          const url = `/uploads/${outputDir}/${finalFileName}`;
+
+          return {
+            success: true,
+            filePath,
+            fileName: finalFileName,
+            url,
+            relativePath,
+          };
+        } catch (apiError) {
+          const elapsedTime = Date.now() - startTime;
+          lastError = apiError;
+
+          // Check if this is a retryable error (connection errors)
+          const isRetryable =
+            apiError.code === "ECONNREFUSED" ||
+            apiError.code === "ENOTFOUND" ||
+            apiError.code === "ETIMEDOUT" ||
+            (apiError.request && !apiError.response);
+
+          if (isRetryable && attempt < maxRetries) {
+            logger.warn(
+              `⚠️ Connection error on attempt ${attempt}/${maxRetries}: ${
+                apiError.code || apiError.message
+              }. Retrying in ${retryDelay}ms...`
+            );
+            continue; // Retry
+          }
+
+          // If not retryable or last attempt, handle the error
+          logger.error("Error calling Kokoro API:", {
+            message: apiError.message,
+            code: apiError.code,
+            textLength: text.length,
+            attempt: `${attempt}/${maxRetries}`,
+            elapsedTime: `${elapsedTime}ms (${elapsedTime / 1000}s)`,
+            timeout: `${timeout}ms (${timeout / 1000}s)`,
+            isTimeout: elapsedTime >= timeout - 1000,
+          });
+          let errorMessage = "Failed to generate speech from API";
+
+          // Check for timeout or abort errors
+          if (
+            apiError.code === "ECONNABORTED" ||
+            apiError.message?.includes("timeout") ||
+            apiError.message?.includes("aborted") ||
+            elapsedTime >= timeout - 1000
+          ) {
+            errorMessage = `Request timeout: The API took ${
+              elapsedTime / 1000
+            }s to respond (timeout: ${timeout / 1000}s, text length: ${
+              text.length
+            } characters). The API server may be slow or overloaded.`;
+            logger.warn(
+              `⚠️ TTS generation timeout after ${elapsedTime}ms (configured timeout: ${timeout}ms) for ${text.length} characters`
+            );
+          } else if (
+            apiError.code === "ECONNREFUSED" ||
+            apiError.code === "ENOTFOUND"
+          ) {
+            errorMessage = `Cannot connect to Kokoro API after ${maxRetries} attempts. Please ensure the API server is running on http://localhost:8880`;
+            logger.error(`❌ Kokoro API connection error: ${apiError.code}`);
+          } else if (apiError.response) {
+            errorMessage =
+              apiError.response.data?.error?.message ||
+              apiError.response.data?.message ||
+              `API returned status ${apiError.response.status}`;
+          } else if (apiError.request) {
+            errorMessage = `No response received from Kokoro API after ${
+              elapsedTime / 1000
+            }s. The server may be overloaded, unreachable, or processing slowly.`;
+            logger.error(
+              `❌ No response from Kokoro API after ${elapsedTime}ms (timeout: ${timeout}ms)`
+            );
+          } else {
+            errorMessage = apiError.message || errorMessage;
+          }
+
+          // If this was the last attempt, return error
+          if (attempt === maxRetries) {
+            return {
+              success: false,
+              message: errorMessage,
+              error: apiError.message,
+              code: apiError.code,
+            };
+          }
+        }
+      }
+
+      // If we get here, all retries failed
+      return {
+        success: false,
+        message: lastError
+          ? `Failed to generate speech after ${maxRetries} attempts: ${lastError.message}`
+          : "Failed to generate speech from API",
+        error: lastError?.message,
+        code: lastError?.code,
+      };
     } catch (error) {
       logger.error("Error handling speech generation:", error);
       return {

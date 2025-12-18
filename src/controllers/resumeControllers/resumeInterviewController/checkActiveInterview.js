@@ -14,17 +14,20 @@ const checkActiveInterview = async (req, res) => {
     logger.info(`Checking active interview for user ${userId}`);
 
     // First, check user's interview state (fast lookup)
-    const userActiveState = await InterviewStateService.getUserActiveInterview(
+    let userActiveState = await InterviewStateService.getUserActiveInterview(
       userId
     );
 
+    let activeInterview = null;
+
     // If no active state or expired, query database to double-check
     if (!userActiveState || userActiveState.isExpired) {
-      // Query database for any active interview
-      const activeInterview = await ResumeInterview.findOne({
+      // Query database for any active interview (matching startInterview logic)
+      activeInterview = await ResumeInterview.findOne({
         candidateId: userId,
         status: { $in: ["in_progress", "paused"] },
         completedAt: null,
+        isActive: true, // Match the check in startInterview
       })
         .sort({ startedAt: -1 })
         .limit(1);
@@ -53,7 +56,10 @@ const checkActiveInterview = async (req, res) => {
           interviewType: "resume",
         });
 
-        // Continue with response preparation
+        // Re-fetch userActiveState after syncing
+        userActiveState = await InterviewStateService.getUserActiveInterview(
+          userId
+        );
       } else {
         // No active interview found
         logger.info(`No active interview found for user ${userId}`);
@@ -65,31 +71,31 @@ const checkActiveInterview = async (req, res) => {
       }
     }
 
-    // Fetch full interview details
-    const interviewId = userActiveState
-      ? userActiveState.interviewId
-      : null;
+    // If we don't have activeInterview yet, fetch it using interviewId from state
+    if (!activeInterview) {
+      const interviewId = userActiveState?.interviewId;
 
-    if (!interviewId) {
-      return res.json({
-        success: true,
-        hasActiveInterview: false,
-        data: null,
-      });
+      if (!interviewId) {
+        return res.json({
+          success: true,
+          hasActiveInterview: false,
+          data: null,
+        });
+      }
+
+      // Validate ObjectId before querying
+      if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+        logger.error(`Invalid interview ID format: ${interviewId}`);
+        await InterviewStateService.clearUserActiveInterview(userId);
+        return res.json({
+          success: true,
+          hasActiveInterview: false,
+          data: null,
+        });
+      }
+
+      activeInterview = await ResumeInterview.findById(interviewId);
     }
-
-    // Validate ObjectId before querying
-    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
-      logger.error(`Invalid interview ID format: ${interviewId}`);
-      await InterviewStateService.clearUserActiveInterview(userId);
-      return res.json({
-        success: true,
-        hasActiveInterview: false,
-        data: null,
-      });
-    }
-
-    const activeInterview = await ResumeInterview.findById(interviewId);
 
     if (!activeInterview) {
       // Interview was deleted or not found, clean up state

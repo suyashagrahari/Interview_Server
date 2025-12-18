@@ -28,6 +28,12 @@ class InterviewStateService {
         interviewType = "resume",
       } = interviewData;
 
+      // Validate interviewId format if provided (undefined is allowed for clearing state)
+      if (interviewId !== undefined && interviewId !== null && !mongoose.Types.ObjectId.isValid(interviewId)) {
+        logger.warn(`Invalid interviewId format: ${interviewId}`);
+        throw new Error(`Invalid interviewId format: ${interviewId}`);
+      }
+
       // Calculate expected end time (assuming 45 minutes default)
       const expectedEndTime = startedAt
         ? new Date(
@@ -73,7 +79,10 @@ class InterviewStateService {
         return null;
       }
 
-      const interview = userState.latestInterview.interviewId;
+      const interviewId = userState.latestInterview.interviewId;
+      
+      // Handle both ObjectId and populated object cases
+      const finalInterviewId = interviewId?._id || interviewId;
 
       // Check if interview is still valid (not expired)
       const now = new Date();
@@ -97,7 +106,7 @@ class InterviewStateService {
       }
 
       return {
-        interviewId: interview._id || userState.latestInterview.interviewId,
+        interviewId: finalInterviewId,
         interviewType: userState.latestInterview.interviewType,
         status: userState.latestInterview.status,
         startedAt: userState.latestInterview.startedAt,
@@ -163,6 +172,7 @@ class InterviewStateService {
 
       if (
         !userState ||
+        !userState.latestInterview.interviewId ||
         userState.latestInterview.interviewId.toString() !==
           interviewId.toString()
       ) {

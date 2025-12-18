@@ -1,4 +1,5 @@
 const { ResumeInterview, logger } = require("./dependencies");
+const mongoose = require("mongoose");
 
 /**
  * Get interview by ID
@@ -8,6 +9,15 @@ const { ResumeInterview, logger } = require("./dependencies");
  */
 const getInterviewById = async (interviewId, userId) => {
   try {
+    // Validate ObjectId format - return early for mock IDs or invalid formats
+    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+      logger.warn(`Invalid interview ID format: ${interviewId}`);
+      return {
+        success: false,
+        message: "Invalid interview ID format",
+      };
+    }
+
     const interview = await ResumeInterview.findOne({
       _id: interviewId,
       candidateId: userId,

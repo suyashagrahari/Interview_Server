@@ -215,9 +215,9 @@ userInterviewStateSchema.statics.updateActiveInterview = async function (
   );
 
   // Add to recent interviews if not already there
-  if (userState) {
+  if (userState && interviewId) {
     const existingIndex = userState.recentInterviews.findIndex(
-      (ri) => ri.interviewId.toString() === interviewId.toString()
+      (ri) => ri.interviewId && ri.interviewId.toString() === interviewId.toString()
     );
 
     if (existingIndex === -1) {
