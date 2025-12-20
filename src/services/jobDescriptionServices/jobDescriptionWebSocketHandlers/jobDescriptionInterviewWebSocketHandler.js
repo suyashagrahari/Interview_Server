@@ -317,15 +317,15 @@ class JobDescriptionInterviewHandler {
         return;
       }
 
-      // Perform sentiment analysis on the answer
+      // Perform sentiment analysis on the answer (use finalAnswer which may be from Groq)
       logger.info(
-        `[JD SubmitAnswer] Analyzing sentiment for answer: "${answer.substring(
+        `[JD SubmitAnswer] Analyzing sentiment for answer: "${finalAnswer.substring(
           0,
           100
         )}..."`
       );
       const sentimentResult = await sentimentAnalysisService.analyzeSentiment(
-        answer
+        finalAnswer
       );
 
       const currentSentiment = sentimentResult.success
@@ -335,12 +335,12 @@ class JobDescriptionInterviewHandler {
         `[JD SubmitAnswer] Sentiment analysis result: ${currentSentiment}`
       );
 
-      // Update answer using unified service
+      // Update answer using unified service (use finalAnswer which may be from Groq)
       const updateResult = await UnifiedQuestionManagementService.submitAnswer(
         interviewId,
         questionId,
         effectiveUserId,
-        answer,
+        finalAnswer,
         proctoringData
       );
 
@@ -407,10 +407,11 @@ class JobDescriptionInterviewHandler {
       );
 
       // Process answer analysis in background (don't wait)
+      // Use finalAnswer which may be from Groq transcription
       const analysisPromise = JobDescriptionAnalysisService.analyzeAnswer(
         interview,
         question,
-        answer,
+        finalAnswer, // Use finalAnswer (from Groq if audio provided, otherwise original text)
         {
           timeSpent,
           startTime,

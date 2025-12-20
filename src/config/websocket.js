@@ -1,6 +1,7 @@
 const { Server } = require("socket.io");
 const InterviewTimerService = require("../services/websocket/interviewTimer");
 const InterviewHandlerService = require("../services/websocket/interviewHandler");
+const logger = require("../utils/logger");
 
 let io;
 let timerService;
@@ -57,13 +58,27 @@ const setupWebSocket = (server) => {
       userId,
       answer,
       proctoringData,
+      audioData, // Base64 encoded audio data
     }) => {
+      // Log received data for debugging
+      logger.info("📥 Received answer:submit event", {
+        interviewId,
+        questionId,
+        userId,
+        hasAnswer: !!answer,
+        answerLength: answer?.length || 0,
+        hasAudioData: !!audioData,
+        audioDataLength: audioData?.length || 0,
+        audioDataType: audioData ? typeof audioData : "none",
+      });
+
       await interviewHandler.handleSubmitAnswer(socket, {
         interviewId,
         questionId,
         userId,
         answer,
         proctoringData,
+        audioData,
       });
     });
 

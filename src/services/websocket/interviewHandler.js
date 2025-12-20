@@ -309,12 +309,93 @@ class InterviewHandlerService {
    */
   async handleSubmitAnswer(
     socket,
-    { interviewId, questionId, userId, answer, proctoringData }
+    { interviewId, questionId, userId, answer, proctoringData, audioData }
   ) {
     try {
       logger.info(
         `📤 Processing answer submission for interview ${interviewId}, question ${questionId}, userId: ${userId}`
       );
+
+      // Initialize finalAnswer with provided answer (will be updated if audio is transcribed)
+      let finalAnswer = answer || "";
+      let transcriptionStatus = "none"; // "none", "transcribing", "success", "failed"
+      let transcribedText = null;
+
+      // If audio data is provided, transcribe it first
+      if (audioData) {
+        try {
+          // Emit transcription started event immediately
+          socket.emit("answer:transcribing", {
+            success: true,
+            message: "Transcribing your answer...",
+            data: {
+              questionId,
+              status: "transcribing",
+            },
+          });
+
+          logger.info("🎤 Audio data received, transcribing with Groq...");
+          logger.info(
+            `📊 Audio data length: ${audioData.length} characters (base64)`
+          );
+          const groqTranscriptionService = require("../groqTranscriptionService");
+
+          // Convert base64 to buffer
+          const audioBuffer = Buffer.from(audioData, "base64");
+          logger.info(`📊 Audio buffer size: ${audioBuffer.length} bytes`);
+
+          // Transcribe audio
+          const transcriptionResult =
+            await groqTranscriptionService.transcribeAudioBuffer(
+              audioBuffer,
+              `answer-${questionId}-${Date.now()}.mp3`
+            );
+
+          if (transcriptionResult.success) {
+            finalAnswer = transcriptionResult.text;
+            transcribedText = transcriptionResult.text;
+            transcriptionStatus = "success";
+            logger.info(
+              `✅ Transcription successful from Groq: "${finalAnswer.substring(
+                0,
+                100
+              )}${finalAnswer.length > 100 ? "..." : ""}"`
+            );
+            console.log(
+              `📝 [GROQ] Text transcribed from audio: "${finalAnswer}"`
+            );
+            console.log(`📝 [GROQ] This text came from Groq API transcription`);
+          } else {
+            transcriptionStatus = "failed";
+            logger.warn(
+              `⚠️ Transcription failed: ${transcriptionResult.message}, using provided text answer`
+            );
+            if (!answer || !answer.trim()) {
+              socket.emit("answer:error", {
+                success: false,
+                message:
+                  "Failed to transcribe audio and no text answer provided",
+                code: "TRANSCRIPTION_FAILED",
+              });
+              return;
+            }
+          }
+        } catch (transcriptionError) {
+          transcriptionStatus = "failed";
+          logger.error("Error transcribing audio:", transcriptionError);
+          if (!answer || !answer.trim()) {
+            socket.emit("answer:error", {
+              success: false,
+              message: "Failed to transcribe audio and no text answer provided",
+              code: "TRANSCRIPTION_ERROR",
+            });
+            return;
+          }
+          logger.warn("Using provided text answer as fallback");
+        }
+      } else {
+        logger.info("📝 No audio data provided, using text answer");
+      }
 
       // Detect interview type first
       const interviewType =
@@ -336,7 +417,7 @@ class InterviewHandlerService {
           interviewId,
           questionId,
           userId,
-          answer,
+          answer: finalAnswer,
           proctoringData,
         });
       }
@@ -346,7 +427,7 @@ class InterviewHandlerService {
           interviewId,
           questionId,
           userId,
-          answer,
+          answer: finalAnswer,
           proctoringData,
         });
       }
@@ -460,15 +541,15 @@ class InterviewHandlerService {
         return;
       }
 
-      // Perform sentiment analysis on the answer
+      // Perform sentiment analysis on the answer (use finalAnswer which may be from Groq)
       logger.info(
-        `[SubmitAnswer] Analyzing sentiment for answer: "${answer.substring(
+        `[SubmitAnswer] Analyzing sentiment for answer: "${finalAnswer.substring(
           0,
           100
         )}..."`
       );
       const sentimentResult = await sentimentAnalysisService.analyzeSentiment(
-        answer
+        finalAnswer
       );
 
       const currentSentiment = sentimentResult.success
@@ -478,12 +559,12 @@ class InterviewHandlerService {
         `[SubmitAnswer] Sentiment analysis result: ${currentSentiment}`
       );
 
-      // Update answer using unified service
+      // Update answer using unified service (use finalAnswer which may be from Groq)
       const updateResult = await UnifiedQuestionManagementService.submitAnswer(
         interviewId,
         questionId,
         effectiveUserId,
-        answer,
+        finalAnswer,
         proctoringData
       );
 
@@ -550,10 +631,11 @@ class InterviewHandlerService {
       );
 
       // Process answer analysis in background (don't wait)
+      // Use finalAnswer which may be from Groq transcription
       const analysisPromise = ResumeAnalysisService.analyzeAnswer(
         interview,
         question,
-        answer,
+        finalAnswer, // Use finalAnswer (from Groq if audio provided, otherwise original text)
         {
           timeSpent,
           startTime,
@@ -582,6 +664,11 @@ class InterviewHandlerService {
           canContinue,
           lastWarningAt: interview.lastWarningAt,
           questionSentiment: currentSentiment,
+          // Transcription data
+          transcribedText: transcribedText || null,
+          transcriptionStatus: transcriptionStatus,
+          hasAudio: !!audioData,
+          originalAnswer: answer || null, // Original text answer (for fallback display)
         },
       });
 
@@ -635,7 +722,7 @@ class InterviewHandlerService {
         socket,
         interview,
         question,
-        answer,
+        finalAnswer, // Use finalAnswer (transcribed text from voice, or original text if no audio)
         effectiveUserId, // Use the actual userId, not the fallback
         questionNumber,
         currentSentiment
@@ -712,41 +799,127 @@ class InterviewHandlerService {
           (interview.questions.length + 1) / 2
         );
 
+        logger.info(
+          `🔍 Calculated poolQuestionIndex: ${poolQuestionIndex}, total questions: ${interview.questions.length}`
+        );
+
         const questionPool = await ResumeQuestionPool.findOne({
           interviewId: interview._id,
           userId: interview.candidateId,
         });
 
-        if (questionPool && questionPool.questions[poolQuestionIndex]) {
-          const poolQuestion = questionPool.questions[poolQuestionIndex];
+        if (!questionPool) {
+          logger.error(
+            `❌ Question pool not found for interview ${interview._id}, userId: ${interview.candidateId}`
+          );
+          socket.emit("question:error", {
+            success: false,
+            message: "Question pool not found",
+            code: "QUESTION_POOL_NOT_FOUND",
+          });
+          return;
+        }
 
-          // Personalize the pool question based on previous answer and sentiment
-          let personalizedQuestion;
-          if (currentSentiment === "NEGATIVE") {
-            // Add warning to the question
-            personalizedQuestion =
-              await ResumeAnalysisService.rephraseQuestionWithWarning(
-                poolQuestion.question,
-                currentSentiment
-              );
-          } else {
-            // Personalize based on previous answer
-            personalizedQuestion =
-              await ResumeAnalysisService.rephraseQuestionWithPersonalization(
-                poolQuestion.question,
-                answer,
-                currentSentiment
-              );
+        logger.info(
+          `🔍 Question pool found with ${questionPool.questions.length} questions`
+        );
+
+        if (poolQuestionIndex >= questionPool.questions.length) {
+          logger.warn(
+            `⚠️ Pool question index ${poolQuestionIndex} is out of bounds. Pool has ${questionPool.questions.length} questions.`
+          );
+          socket.emit("interview:complete", {
+            success: true,
+            message: "Interview completed - no more questions available",
+            data: {
+              totalQuestionsAsked: interview.questions.length,
+              isInterviewComplete: true,
+            },
+          });
+          return;
+        }
+
+        const poolQuestion = questionPool.questions[poolQuestionIndex];
+
+        if (!poolQuestion) {
+          logger.error(
+            `❌ Pool question at index ${poolQuestionIndex} is null or undefined`
+          );
+          socket.emit("question:error", {
+            success: false,
+            message: "Question not found in pool",
+            code: "POOL_QUESTION_NOT_FOUND",
+          });
+          return;
+        }
+
+        // Check if question was already asked
+        if (poolQuestion.isAsked) {
+          logger.warn(
+            `⚠️ Pool question ${poolQuestion.questionId} at index ${poolQuestionIndex} was already asked. Skipping to next available question.`
+          );
+          // Try to find next available question
+          let foundNextQuestion = false;
+          for (
+            let i = poolQuestionIndex + 1;
+            i < questionPool.questions.length;
+            i++
+          ) {
+            if (!questionPool.questions[i].isAsked) {
+              const nextAvailableQuestion = questionPool.questions[i];
+              poolQuestion.questionId = nextAvailableQuestion.questionId;
+              poolQuestion.question = nextAvailableQuestion.question;
+              poolQuestion.category = nextAvailableQuestion.category;
+              poolQuestion.difficulty = nextAvailableQuestion.difficulty;
+              poolQuestion.expectedAnswer =
+                nextAvailableQuestion.expectedAnswer;
+              foundNextQuestion = true;
+              logger.info(`✅ Found next available question at index ${i}`);
+              break;
+            }
           }
+          if (!foundNextQuestion) {
+            logger.warn(`⚠️ No more unasked questions in pool`);
+            socket.emit("interview:complete", {
+              success: true,
+              message: "Interview completed - all questions asked",
+              data: {
+                totalQuestionsAsked: interview.questions.length,
+                isInterviewComplete: true,
+              },
+            });
+            return;
+          }
+        }
 
-          nextQuestion = {
-            questionId: poolQuestion.questionId,
-            question: personalizedQuestion,
-            category: poolQuestion.category,
-            difficulty: poolQuestion.difficulty || "medium",
-            expectedAnswer: poolQuestion.expectedAnswer,
-          };
+        // Personalize the pool question based on previous answer and sentiment
+        let personalizedQuestion;
+        if (currentSentiment === "NEGATIVE") {
+          // Add warning to the question
+          personalizedQuestion =
+            await ResumeAnalysisService.rephraseQuestionWithWarning(
+              poolQuestion.question,
+              currentSentiment
+            );
+        } else {
+          // Personalize based on previous answer
+          personalizedQuestion =
+            await ResumeAnalysisService.rephraseQuestionWithPersonalization(
+              poolQuestion.question,
+              answer,
+              currentSentiment
+            );
+        }
 
+        nextQuestion = {
+          questionId: poolQuestion.questionId,
+          question: personalizedQuestion,
+          category: poolQuestion.category,
+          difficulty: poolQuestion.difficulty || "medium",
+          expectedAnswer: poolQuestion.expectedAnswer,
+        };
+
+        try {
           await interview.addQuestion({
             questionId: nextQuestion.questionId,
             question: nextQuestion.question,
@@ -758,6 +931,52 @@ class InterviewHandlerService {
 
           // Mark question as asked in question pool
           await questionPool.markQuestionAsked(poolQuestion.questionId);
+          logger.info(
+            `✅ Added pool question ${nextQuestion.questionId} to interview`
+          );
+        } catch (addQuestionError) {
+          logger.error(
+            "Error adding pool question to interview:",
+            addQuestionError
+          );
+          throw addQuestionError;
+        }
+      } else if (currentQuestion.questionType === "introduction") {
+        // Current question is introduction, generate follow-up question
+        logger.info("🔄 Generating follow-up question after introduction...");
+
+        nextQuestion = await ResumeAnalysisService.generateFollowUpQuestion(
+          interview,
+          currentQuestion,
+          answer,
+          interview.questions.length,
+          currentSentiment
+        );
+
+        if (nextQuestion) {
+          try {
+            await interview.addQuestion({
+              questionId: nextQuestion.questionId,
+              question: nextQuestion.question,
+              category: nextQuestion.category,
+              difficulty: nextQuestion.difficulty || "medium",
+              expectedAnswer: nextQuestion.expectedAnswer,
+              questionType: "followup",
+            });
+            logger.info(
+              `✅ Added follow-up question ${nextQuestion.questionId} after introduction`
+            );
+          } catch (addQuestionError) {
+            logger.error(
+              "Error adding follow-up question to interview:",
+              addQuestionError
+            );
+            throw addQuestionError;
+          }
+        } else {
+          logger.warn(
+            "⚠️ Failed to generate follow-up question after introduction"
+          );
         }
       }
 

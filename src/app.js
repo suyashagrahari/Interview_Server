@@ -33,6 +33,7 @@ const topicTitleRoutes = require("./routes/topicTitle");
 const topicQuestionRoutes = require("./routes/topicQuestion");
 const jobTitleRoutes = require("./routes/jobTitle");
 const coverLetterRoutes = require("./routes/coverLetter");
+const audioUploadRoutes = require("./routes/audioUpload");
 
 // Import database
 const database = require("./config/database");
@@ -96,6 +97,7 @@ app.use("/api/topic-titles", topicTitleRoutes);
 app.use("/api/topic-questions", topicQuestionRoutes);
 app.use("/api/job-titles", jobTitleRoutes);
 app.use("/api/cover-letter", coverLetterRoutes);
+app.use("/api/audio", audioUploadRoutes);
 
 // Serve static files for uploads (audio/voice files)
 app.use("/uploads", express.static("uploads"));

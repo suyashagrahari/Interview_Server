@@ -81,6 +81,3 @@ const getInterviewById = async (interviewId, userId) => {
 };
 
 module.exports = getInterviewById;
-
-
-
